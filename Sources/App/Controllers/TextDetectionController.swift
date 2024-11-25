@@ -14,9 +14,9 @@ struct TextDetectionController: RouteCollection {
         // 配置文本识别接口
         textDetectionRoute.post("recognize-text", use: recognizeTextRequest)
             .openAPI(
-                description: "识别图像中的文本（OCR功能）。",
+                description: "识别图像中的文本（OCR功能）。支持中文、英文等多种语言的识别。",
                 body: .type(recognizeText.self),
-                contentType: .application(.json),
+                contentType: .multipart(.formData),
                 response: .type(recognizeTextResponse.self)
             )
     }
@@ -27,16 +27,17 @@ struct TextDetectionController: RouteCollection {
     /// - Throws: 处理过程中可能发生的错误
     @Sendable func recognizeTextRequest(req: Request) async throws -> recognizeTextResponse {
         // 解码请求数据
-        let requestForm = try req.content.decode(recognizeText.self)
+        let imageFile = try req.content.get(Data.self, at: "imageFile")
+        // 获取可选参数
+        let recognitionLanguages = (try? req.content.get(String.self, at: "recognitionLanguages"))?
+            .components(separatedBy: ",")
+            .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+        let recognitionLevel = try? req.content.get(Int.self, at: "recognitionLevel")
 
         var textString = ""
-        // 验证并解码Base64图像数据
-        guard let imageData = Data(base64Encoded: requestForm.imageBase64) else {
-            return recognizeTextResponse(text: "无效的图像数据")
-        }
 
         // 创建图像处理处理器
-        let requestHandler = VNImageRequestHandler(data: imageData)
+        let requestHandler = VNImageRequestHandler(data: imageFile)
         
         /// 文本识别完成后的回调处理
         func recognizeTextHandler(request: VNRequest, error: Error?) {
@@ -58,14 +59,14 @@ struct TextDetectionController: RouteCollection {
         let textRequest = VNRecognizeTextRequest(completionHandler: recognizeTextHandler)
 
         // 配置识别语言
-        if let languages = requestForm.recognitionLanguages {
+        if let languages = recognitionLanguages {
             textRequest.recognitionLanguages = languages
         } else {
             textRequest.automaticallyDetectsLanguage = true
         }
 
         // 配置识别精度级别
-        if requestForm.recognitionLevel == 1 {
+        if recognitionLevel == 1 {
             textRequest.recognitionLevel = .fast
         }
 
@@ -81,14 +82,16 @@ struct TextDetectionController: RouteCollection {
     }
 }
 
-/// 文本识别请求的数据模型
+/// OpenAPI文档用的请求模型
 @OpenAPIDescriptable
 struct recognizeText: Content {
-    /// Base64编码的图像数据字符串
-    var imageBase64: String
-    /// 识别语言的ISO语言代码数组，例如：["zh", "en"]
-    var recognitionLanguages: [String]?
-    /// 识别精度级别：0 = 精确模式，1 = 快速模式，默认为精确模式
+    /// 上传的图像文件（支持常见图片格式如PNG、JPEG等）
+    var imageFile: Data
+
+    /// 识别语言，使用逗号分隔的ISO语言代码，例如：zh,en。不填则自动检测语言。
+    var recognitionLanguages: String?
+
+    /// 识别精度级别：0 = 精确模式（默认），1 = 快速模式
     var recognitionLevel: Int?
 }
 
