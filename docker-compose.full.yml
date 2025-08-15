@@ -1,0 +1,47 @@
+# Docker Compose 完整配置
+# 同时运行 Vision API 后端服务和 Web 前端界面
+version: '3.8'
+
+services:
+  # Vision API 后端服务
+  vision-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vision-api-backend
+    environment:
+      - LOG_LEVEL=info
+    ports:
+      - "8080:8080"
+    networks:
+      - vision-network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    restart: unless-stopped
+
+  # Web 前端界面
+  vision-web:
+    build:
+      context: ./vision-web
+      dockerfile: Dockerfile
+    container_name: vision-web-frontend
+    ports:
+      - "3000:80"
+    depends_on:
+      vision-api:
+        condition: service_healthy
+    networks:
+      - vision-network
+    restart: unless-stopped
+
+networks:
+  vision-network:
+    driver: bridge
+
+volumes:
+  # 如果需要持久化数据，可以在这里添加卷配置
+  vision_data:

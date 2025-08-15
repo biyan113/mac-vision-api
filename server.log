@@ -1,0 +1,22 @@
+warning: 'swift-algorithms': found 1 file(s) which are unhandled; explicitly declare them as resources or exclude from the target
+    /Users/pan/Desktop/vision-api/.build/checkouts/swift-algorithms/Sources/Algorithms/Documentation.docc
+[0/1] Planning build
+Building for debugging...
+[0/3] Write swift-version--58304C5D6DBC2206.txt
+Build of product 'App' complete! (11.47s)
+[ NOTICE ] Server started on http://127.0.0.1:8080
+[ INFO ] GET /health [request-id: 4C4C3BED-6EF1-4909-B942-97E030B20B9C]
+[ INFO ] GET /health [request-id: 28FCE0EC-0CB2-4ADF-96FE-B05722DA813D]
+[ INFO ] GET /health [request-id: 70EED447-BA18-4F34-9EAC-69AFC2CDEFAD]
+[ INFO ] GET /health [request-id: D9775522-BD55-4272-AEDF-A136FD02ABA9]
+[ INFO ] GET /health [request-id: 5B075DE3-0D7C-4413-ABEF-418192153490]
+[ INFO ] GET /health [request-id: 47929C5A-9CC0-4A6F-B962-18F7BA1CDD07]
+[ INFO ] GET /health [request-id: 8C26CC84-75FB-4317-A3BE-8CF1FC3F7C6A]
+[ INFO ] GET /health [request-id: 5F5075FC-1B0C-4660-9761-96691B1CCA72]
+[ INFO ] GET /health [request-id: 353E3EA8-0A9A-4590-82D5-E372882E1C3B]
+[ INFO ] POST /pdf/render [request-id: 58F1534C-E3CE-46AB-8CCD-6FD9DE1C17A6]
+[ WARNING ] _NIOBase64.Base64Error.invalidLength [request-id: 58F1534C-E3CE-46AB-8CCD-6FD9DE1C17A6]
+[ INFO ] POST /pdf/extract-text [request-id: 6DB875A3-E1BC-46F4-93BC-F9F3B2F4C5A0]
+[ WARNING ] _NIOBase64.Base64Error.invalidLength [request-id: 6DB875A3-E1BC-46F4-93BC-F9F3B2F4C5A0]
+[ INFO ] GET /health [request-id: CE1D4232-911F-4D1A-8B0B-3E414E866ED5]
+[ INFO ] GET /health [request-id: 36B191E6-4EA1-459A-860A-BDA700BF5B2E]

@@ -1,0 +1,25 @@
+# Docker Compose 开发环境配置
+# 仅运行后端 API，前端使用本地开发服务器
+version: '3.8'
+
+services:
+  # Vision API 后端服务
+  vision-api:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: vision-api-dev
+    environment:
+      - LOG_LEVEL=debug
+    ports:
+      - "8080:8080"
+    volumes:
+      # 挂载源代码用于开发（如果需要）
+      - ./Sources:/app/Sources:ro
+    networks:
+      - vision-network
+    restart: unless-stopped
+
+networks:
+  vision-network:
+    driver: bridge
