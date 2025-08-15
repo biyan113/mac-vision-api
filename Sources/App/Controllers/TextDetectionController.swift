@@ -1,7 +1,7 @@
+import SwiftOpenAPI
 // 导入必要的框架
 import Vapor
 import Vision
-import SwiftOpenAPI
 
 /// 文本检测控制器
 /// 提供图像中文本识别（OCR）相关的API接口
@@ -27,7 +27,36 @@ struct TextDetectionController: RouteCollection {
     /// - Throws: 处理过程中可能发生的错误
     @Sendable func recognizeTextRequest(req: Request) async throws -> recognizeTextResponse {
         // 解码请求数据
-        let imageFile = try req.content.get(Data.self, at: "imageFile")
+        var imageData: Data
+
+        if let imageFile = try? req.content.get(Data.self, at: "imageFile") {
+            imageData = imageFile
+        } else if let imagePath = try? req.content.get(String.self, at: "imagePath") {
+            // 处理本地文件路径
+            guard let fileData = FileManager.default.contents(atPath: imagePath) else {
+                throw Abort(.badRequest, reason: "无法读取指定路径的图片文件")
+            }
+            imageData = fileData
+        } else if let imageURL = try? req.content.get(String.self, at: "imageURL") {
+            // 处理远程URL
+            let uri = URI(string: imageURL)
+            let response = try await req.client.get(uri)
+            guard let remoteData = response.body else {
+                throw Abort(.badRequest, reason: "无法从URL获取图片数据")
+            }
+            imageData = Data(buffer: remoteData)
+        } else if let base64String = try? req.content.get(String.self, at: "imageBase64") {
+            // 处理 base64 编码的图片数据
+            // 移除可能存在的 base64 头部信息（如 "data:image/jpeg;base64,"）
+            let base64Data = base64String.components(separatedBy: ",").last ?? base64String
+            guard let decodedData = Data(base64Encoded: base64Data) else {
+                throw Abort(.badRequest, reason: "无效的Base64图片数据")
+            }
+            imageData = decodedData
+        } else {
+            throw Abort(.badRequest, reason: "请提供图片文件、本地路径、远程URL或Base64编码数据其中之一")
+        }
+
         // 获取可选参数
         let recognitionLanguages = (try? req.content.get(String.self, at: "recognitionLanguages"))?
             .components(separatedBy: ",")
@@ -37,12 +66,13 @@ struct TextDetectionController: RouteCollection {
         var textString = ""
 
         // 创建图像处理处理器
-        let requestHandler = VNImageRequestHandler(data: imageFile)
-        
+        let requestHandler = VNImageRequestHandler(data: imageData)
+
         /// 文本识别完成后的回调处理
         func recognizeTextHandler(request: VNRequest, error: Error?) {
-            guard let observations =
-                request.results as? [VNRecognizedTextObservation]
+            guard
+                let observations =
+                    request.results as? [VNRecognizedTextObservation]
             else {
                 return
             }
@@ -86,7 +116,16 @@ struct TextDetectionController: RouteCollection {
 @OpenAPIDescriptable
 struct recognizeText: Content {
     /// 上传的图像文件（支持常见图片格式如PNG、JPEG等）
-    var imageFile: Data
+    var imageFile: Data?
+
+    /// 本地图片文件路径
+    var imagePath: String?
+
+    /// 远程图片URL
+    var imageURL: String?
+
+    /// Base64编码的图片数据
+    var imageBase64: String?
 
     /// 识别语言，使用逗号分隔的ISO语言代码，例如：zh,en。不填则自动检测语言。
     var recognitionLanguages: String?

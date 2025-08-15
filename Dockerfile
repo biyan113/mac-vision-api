@@ -1,5 +1,17 @@
 # ================================
-# Build image
+# Frontend build stage
+# ================================
+FROM node:18-alpine AS frontend-build
+
+WORKDIR /frontend
+COPY vision-web/package*.json ./
+RUN npm ci --only=production
+
+COPY vision-web/ ./
+RUN npm run build
+
+# ================================
+# Backend build image
 # ================================
 FROM swift:6.0-jammy AS build
 
@@ -45,6 +57,9 @@ RUN find -L "$(swift build --package-path /build -c release --show-bin-path)/" -
 # Ensure that by default, neither the directory nor any of its contents are writable.
 RUN [ -d /build/Public ] && { mv /build/Public ./Public && chmod -R a-w ./Public; } || true
 RUN [ -d /build/Resources ] && { mv /build/Resources ./Resources && chmod -R a-w ./Resources; } || true
+
+# Copy frontend build output
+COPY --from=frontend-build /frontend/dist ./Public
 
 # ================================
 # Run image

@@ -5,6 +5,14 @@ import Vapor
 /// - Parameter app: 要配置的应用程序实例
 /// - Throws: 配置过程中可能发生的错误
 public func configure(_ app: Application) async throws {
+    // 配置CORS中间件
+    let corsConfiguration = CORSMiddleware.Configuration(
+        allowedOrigin: .all,
+        allowedMethods: [.GET, .POST, .PUT, .OPTIONS, .DELETE, .PATCH],
+        allowedHeaders: [.accept, .authorization, .contentType, .origin, .xRequestedWith, .userAgent, .accessControlAllowOrigin]
+    )
+    app.middleware.use(CORSMiddleware(configuration: corsConfiguration), at: .beginning)
+    
     // 配置静态文件中间件
     // 用于提供public目录下的静态文件服务，默认文件为index.html
     app.middleware.use(FileMiddleware(publicDirectory: app.directory.publicDirectory, defaultFile: "index.html"))

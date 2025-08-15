@@ -10,9 +10,14 @@ func routes(_ app: Application) throws {
     app.routes.defaultMaxBodySize = "20mb"
 
     // 配置根路由
-    // 访问根路径时重定向到Swagger文档页面
+    // 访问根路径时返回简单的健康检查响应
     app.get { req async in
-        req.redirect(to: "/Swagger/index.html")
+        return ["status": "ok", "message": "Vision API is running"]
+    }
+    
+    // 健康检查端点
+    app.get("health") { req async in
+        return ["status": "healthy", "timestamp": "\(Date())"]
     }
 
     // 注册文本检测控制器
@@ -27,11 +32,4 @@ func routes(_ app: Application) throws {
         // 在较早版本上不提供此功能
     }
     
-    // 注册翻译控制器
-    // 提供文本翻译服务
-    try app.register(collection: TranslationController())
-    
-    // 注册OpenAPI（Swagger）控制器
-    // 提供API文档服务
-    try app.register(collection: OpenAPIController())
 }
