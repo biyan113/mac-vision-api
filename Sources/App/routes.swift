@@ -24,6 +24,9 @@ func routes(_ app: Application) throws {
     // 提供OCR相关的API端点
     try app.register(collection: TextDetectionController())
     
+    // 注册PDF处理控制器
+    try app.register(collection: PDFController())
+    
     // 注册图像特征控制器
     // 仅在macOS 15.0及以上版本可用
     if #available(macOS 15.0, *) {

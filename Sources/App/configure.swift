@@ -5,6 +5,12 @@ import Vapor
 /// - Parameter app: 要配置的应用程序实例
 /// - Throws: 配置过程中可能发生的错误
 public func configure(_ app: Application) async throws {
+    // 配置请求体大小限制
+    app.routes.defaultMaxBodySize = "100mb"
+    
+    // 配置multipart解析限制
+    app.http.server.configuration.requestDecompression = .enabled(limit: .size(100 * 1024 * 1024))
+    
     // 配置CORS中间件
     let corsConfiguration = CORSMiddleware.Configuration(
         allowedOrigin: .all,
