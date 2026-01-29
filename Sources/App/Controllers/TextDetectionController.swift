@@ -58,9 +58,19 @@ struct TextDetectionController: RouteCollection {
         }
 
         // 获取可选参数
-        let recognitionLanguages = (try? req.content.get(String.self, at: "recognitionLanguages"))?
+        var recognitionLanguages = (try? req.content.get(String.self, at: "recognitionLanguages"))?
             .components(separatedBy: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
+
+        // 智能语言处理：如果只指定了中文，自动添加英文支持以处理混合内容
+        if let languages = recognitionLanguages, languages.count == 1 {
+            let lang = languages[0]
+            if lang.hasPrefix("zh") || lang == "zh" {
+                // 中文用户通常会接触到英文文本，自动添加英文支持
+                recognitionLanguages = [lang, "en-US"]
+            }
+        }
+
         let recognitionLevel = try? req.content.get(Int.self, at: "recognitionLevel")
 
         var textString = ""
@@ -89,9 +99,12 @@ struct TextDetectionController: RouteCollection {
         let textRequest = VNRecognizeTextRequest(completionHandler: recognizeTextHandler)
 
         // 配置识别语言
-        if let languages = recognitionLanguages {
+        // 注意：recognitionLanguages 支持数组，可以同时指定多种语言进行混合识别
+        // 例如 ["zh-Hans", "en-US"] 可以同时识别中英文
+        if let languages = recognitionLanguages, !languages.isEmpty {
             textRequest.recognitionLanguages = languages
         } else {
+            // 自动检测语言模式：Vision 会自动识别文本语言
             textRequest.automaticallyDetectsLanguage = true
         }
 
@@ -127,7 +140,16 @@ struct recognizeText: Content {
     /// Base64编码的图片数据
     var imageBase64: String?
 
-    /// 识别语言，使用逗号分隔的ISO语言代码，例如：zh,en。不填则自动检测语言。
+    /// 识别语言，使用逗号分隔的语言代码。
+    /// 常用值：
+    /// - zh-Hans: 简体中文
+    /// - zh-Hant: 繁体中文
+    /// - en-US: 英文
+    /// - ja: 日语
+    /// - ko: 韩语
+    ///
+    /// 多语言混合识别：zh-Hans,en-US（可同时识别中英文）
+    /// 不填则自动检测语言（推荐用于不确定文本语言的情况）
     var recognitionLanguages: String?
 
     /// 识别精度级别：0 = 精确模式（默认），1 = 快速模式
