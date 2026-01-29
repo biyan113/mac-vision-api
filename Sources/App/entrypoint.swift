@@ -36,6 +36,8 @@ enum Entrypoint {
             throw error
         }
         
+        // 启动前打印启动来源
+        app.logger.info("由微信公众号 字节笔记本提供")
         // 启动应用程序
         try await app.execute()
         // 应用程序结束时进行清理
