@@ -34,5 +34,8 @@ func routes(_ app: Application) throws {
     } else {
         // 在较早版本上不提供此功能
     }
-    
+
+    // 注册视觉分析控制器（图像分类、物体检测、条码识别）
+    try app.register(collection: VisionAnalysisController())
+
 }
