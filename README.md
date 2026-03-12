@@ -32,8 +32,8 @@ For more feature visit: [Vision Framwork](https://developer.apple.com/documentat
 
 1. Clone the project to your local machine:
    ```bash
-   git clone https://github.com/tdawn0-0/vision-api
-   cd vision-api
+   git clone https://github.com/biyan113/mac-vision-api
+   cd mac-vision-api
    ```
 
 2. Install dependencies:
@@ -65,4 +65,4 @@ For more API detail visit: http://localhost:8080/Swagger/index.html
 
 ## Contributing
 
-Contributions are welcome! If you have suggestions for features or encounter issues, feel free to submit an issue or pull request.
+Contributions are welcome! If you have suggestions for features or if you encounter issues, feel free to submit an issue or pull request.
