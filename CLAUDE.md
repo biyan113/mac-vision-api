@@ -30,6 +30,7 @@ docker compose up --build        # web UI image only (nginx, proxies /api to the
 - `Sources/VisionAPI/Support/` — `ServiceConfig` (env config + API key middleware), `InputResolver` (shared input handling + `Offload`), `VisionSupport` (shared models and helpers).
 - `Sources/App/entrypoint.swift` — thin executable that calls `VisionAPI.configure`.
 - `Tests/VisionAPITests/` — XCTVapor tests.
+- `vision-web/src/` — web UI. One page component per feature in `components/`; all HTTP calls go through `services/api.ts` (shared axios instance, API key header, `errorMessage`); `components/ui/Common.tsx` has shared page pieces; `hooks/useCapabilities.ts` reads `/capabilities` to flag unsupported features. Uses `HashRouter` so it works when served by the backend.
 - `Public/Swagger/` — Swagger UI static files; reads `/Swagger/swagger.json`.
 - `.github/workflows/` — `ci.yml` (macOS build/test, web build), `release.yml` (tagged release: macOS tarball + web image to GHCR).
 
@@ -62,3 +63,4 @@ docker compose up --build        # web UI image only (nginx, proxies /api to the
 2. Register it in `routes.swift` with the right availability check; update `Capabilities`.
 3. Add a test for input validation in `Tests/VisionAPITests/`.
 4. Document it in `README.md` and `API_DOCUMENTATION.md`.
+5. If it should be usable from the web UI, add the API call to `vision-web/src/services/api.ts` and a page (or a mode in `VisionAnalysisPage.tsx`).

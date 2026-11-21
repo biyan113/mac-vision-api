@@ -43,7 +43,7 @@ curl -fsSL https://raw.githubusercontent.com/biyan113/mac-vision-api/master/scri
 cd ~/.vision-api && ./vision-api serve --env production --hostname 127.0.0.1 --port 8080
 ```
 
-发布包里带有 Web 界面，启动后访问 `http://localhost:8080/`。也可以到 [Releases](https://github.com/biyan113/mac-vision-api/releases) 手动下载 `vision-api-macos-arm64.tar.gz`。
+发布包里带有 [Web 界面](#web-界面)，启动后访问 `http://localhost:8080/`。也可以到 [Releases](https://github.com/biyan113/mac-vision-api/releases) 手动下载 `vision-api-macos-arm64.tar.gz`。
 
 ### 方式二：从源码运行
 
@@ -128,6 +128,106 @@ curl -X POST http://localhost:8080/translation/translate \
 ```
 
 图片类接口都接受四种输入之一：`imageFile`（上传）、`imageURL`、`imageBase64`、`imagePath`。PDF 和音频接口把前缀换成 `pdf` 和 `audio`。
+
+## Web 界面
+
+发布包自带 Web 界面，启动后访问 `http://localhost:8080/`。页面包括：
+
+| 页面 | 用途 |
+|---|---|
+| OCR 文字识别 | 上传图片提取文字 |
+| 文档结构识别 | 提取段落和表格，表格可导出 CSV |
+| 图像分析 | 分类、物体与人脸检测、条码、姿态、显著性、矩形、地平线、美学评分、镜头污渍；检测位置直接标注在图片上 |
+| 背景移除 | 生成透明背景 PNG |
+| PDF 处理 | 渲染页面、抽取文本 |
+| 语音转写 | 带时间戳的转写结果，可导出 TXT 和 SRT 字幕 |
+| 翻译 | 文本翻译，源语言可自动检测 |
+
+右上角的“API配置”可以改后端地址，后端设置了 `VISION_API_KEY` 时在这里填写密钥。当前系统不支持的功能会在对应页面给出提示。
+
+## 可以搭建的工作流
+
+单个接口解决的是一步，把它们串起来才是完整的活。下面是几类实用的组合。
+
+| 目标 | 接口组合 |
+|---|---|
+| 扫描版 PDF 转成可搜索文本 | `/pdf/render` → `/text-detection/recognize-text` |
+| 票据、报表图片转成表格 | `/text-detection/recognize-document` → CSV |
+| 会议录音生成文字稿和双语稿 | `/speech/transcribe` → `/translation/translate` |
+| 外文图片、菜单、截图翻译 | `/text-detection/recognize-text` → `/translation/translate` |
+| 商品图批量抠图并自动打标签 | `/image-feature/background-removal` + `/vision/classify` |
+| 从一批照片里挑出好照片 | `/vision/aesthetics` + `/vision/lens-smudge` |
+| 拍照文档自动裁边和校正 | `/vision/detect-rectangles` + `/vision/detect-horizon`，按返回的角点和角度在客户端裁剪 |
+| 人脸打码 | `/vision/detect-faces`，按返回的人脸框在客户端模糊 |
+| 条码、二维码批量录入 | `/vision/scan-barcode` → CSV |
+| 自动生成缩略图的裁剪区域 | `/vision/saliency`，以最显著的区域为中心裁剪 |
+
+这些都可以接到 macOS 快捷指令、文件夹监听脚本或 n8n 这类自动化工具里，因为每一步只是一个 HTTP 请求。
+
+下面的脚本需要 `curl` 和 `jq`，并假设 `API=http://localhost:8080`。
+
+### 扫描版 PDF 转文本
+
+PDF 没有文本层时，逐页渲染成图片再做 OCR。
+
+```bash
+pages=$(curl -s -F pdfFile=@scan.pdf "$API/pdf/extract-text" | jq .totalPages)
+for i in $(seq 0 $((pages - 1))); do
+  curl -s -F pdfFile=@scan.pdf -F pageIndex=$i -F dpi=200 "$API/pdf/render" -o page.png
+  curl -s -F imageFile=@page.png -F recognitionLanguages=zh-Hans,en-US \
+    "$API/text-detection/recognize-text" | jq -r .text >> scan.txt
+done
+```
+
+### 票据图片转 CSV（macOS 26+）
+
+```bash
+curl -s -F imageFile=@invoice.jpg "$API/text-detection/recognize-document" \
+  | jq -r '.tables[0].rows[] | @csv' > invoice.csv
+```
+
+### 会议录音转文字稿并翻译（macOS 26+）
+
+```bash
+curl -s -F audioFile=@meeting.m4a -F locale=en-US "$API/speech/transcribe" > transcript.json
+jq -r .text transcript.json > meeting.en.txt
+
+jq '{texts: [.segments[].text], sourceLanguage: "en", targetLanguage: "zh-Hans"}' transcript.json \
+  | curl -s -H 'Content-Type: application/json' -d @- "$API/translation/translate" \
+  | jq -r '.translations[]' > meeting.zh.txt
+```
+
+译文与 `segments` 一一对应，配合每段的 `start` 和 `duration` 就能生成双语字幕。
+
+### 图片里的外文翻译（macOS 26+）
+
+```bash
+curl -s -F imageFile=@menu.jpg "$API/text-detection/recognize-text" \
+  | jq '{text: .text, targetLanguage: "zh-Hans"}' \
+  | curl -s -H 'Content-Type: application/json' -d @- "$API/translation/translate" \
+  | jq -r '.translations[]'
+```
+
+### 商品图批量抠图并打标签
+
+```bash
+mkdir -p out
+for f in products/*.jpg; do
+  name=$(basename "${f%.*}")
+  curl -s -F imageFile=@"$f" "$API/image-feature/background-removal" -o "out/$name.png"
+  curl -s -F imageFile=@"$f" -F maxResults=3 "$API/vision/classify" \
+    | jq -r --arg name "$name" '[$name, .classifications[].identifier] | @csv' >> out/tags.csv
+done
+```
+
+### 从一批照片里挑出好照片（macOS 15+）
+
+```bash
+for f in photos/*.jpg; do
+  score=$(curl -s -F imageFile=@"$f" "$API/vision/aesthetics" | jq .overallScore)
+  echo "$score,$f"
+done | sort -t, -k1 -nr | head -20
+```
 
 ## macOS 26 能力的前提
 

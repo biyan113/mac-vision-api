@@ -1,6 +1,5 @@
-import axios from 'axios'
 import type { AxiosResponse } from 'axios'
-import { getCurrentApiUrl } from './api'
+import api from './api'
 
 // PDF渲染请求接口
 export interface PDFRenderRequest {
@@ -59,11 +58,6 @@ export const renderPDF = async (data: PDFRenderRequest): Promise<Blob> => {
     formData.append('dpi', data.dpi.toString())
   }
 
-  const api = axios.create({
-    baseURL: getCurrentApiUrl(),
-    timeout: 60000,
-  })
-
   const response: AxiosResponse<Blob> = await api.post(
     '/pdf/render',
     formData,
@@ -103,11 +97,6 @@ export const extractPDFText = async (data: PDFTextRequest): Promise<PDFTextRespo
   if (data.mergePages !== undefined) {
     formData.append('mergePages', data.mergePages.toString())
   }
-
-  const api = axios.create({
-    baseURL: getCurrentApiUrl(),
-    timeout: 60000,
-  })
 
   const response: AxiosResponse<PDFTextResponse> = await api.post(
     '/pdf/extract-text',
