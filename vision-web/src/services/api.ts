@@ -2,7 +2,12 @@ import axios from 'axios'
 import type { AxiosResponse } from 'axios'
 
 // API基础配置
-let API_BASE_URL = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8080'
+// 可在构建时用 VITE_API_BASE_URL 覆盖：
+// - nginx 镜像中为 /api（由 nginx 反向代理到后端）
+// - 随后端一起发布时为 /（前端与 API 同源）
+let API_BASE_URL: string =
+  import.meta.env.VITE_API_BASE_URL ||
+  (import.meta.env.PROD ? '/api' : 'http://localhost:8080')
 
 // 从localStorage获取用户配置的API地址
 const getApiBaseUrl = (): string => {
