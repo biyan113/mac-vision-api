@@ -4,124 +4,61 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 ## Project Overview
 
-Vision API is a Swift/Vapor-based RESTful service that exposes Apple Vision framework capabilities for self-hosted image processing. The service provides OCR (text recognition) and background removal features through HTTP APIs.
+Vision API is a Swift/Vapor service that exposes on-device macOS capabilities (Apple Vision, PDFKit, Speech, Translation) as a REST API. It is macOS only: the backend cannot be built or run on Linux, so there is no backend Docker image. Apple Intelligence / Foundation Models are deliberately not used.
 
-**Key Technologies:**
-- **Framework**: Vapor 4.x (Swift server-side web framework)
-- **Platform**: macOS only (requires Apple Vision framework)
-- **Swift Version**: 6.0 with strict concurrency
-- **Dependencies**: VaporToOpenAPI for documentation, SwiftNIO for networking
+- **Framework**: Vapor 4.x, VaporToOpenAPI for docs
+- **Swift**: tools version 6.0, language mode 5 with strict concurrency checking
+- **Minimum OS**: macOS 13; newer features are gated at runtime
+- **Frontend**: `vision-web/` (React + Vite), optional
 
-## Development Commands
+## Commands
 
-### Core Development Workflow
 ```bash
-# Install/update dependencies
-swift package resolve
+swift build                      # build
+swift test                       # run tests
+swift test --filter VisionAPITests/testHealth   # single test
+swift run App serve --hostname 127.0.0.1 --port 8080
 
-# Run development server (default: localhost:8080)
-swift run App
-
-# Run with specific environment
-swift run App serve --env development --hostname 0.0.0.0 --port 8080
-
-# Build the project
-swift build
-
-# Run tests
-swift test
+cd vision-web && npm ci && npm run build        # web UI
+docker compose up --build        # web UI image only (nginx, proxies /api to the Mac host)
 ```
 
-### Docker Development
-```bash
-# Build Docker image
-docker-compose build
+## Layout
 
-# Start service in production mode
-docker-compose up app
+- `Sources/VisionAPI/` — library target with everything. `configure.swift` (middleware + `version`), `routes.swift` (route registration, `/health`, `/capabilities`).
+- `Sources/VisionAPI/Controllers/` — one `RouteCollection` per area.
+- `Sources/VisionAPI/Support/` — `ServiceConfig` (env config + API key middleware), `InputResolver` (shared input handling + `Offload`), `VisionSupport` (shared models and helpers).
+- `Sources/App/entrypoint.swift` — thin executable that calls `VisionAPI.configure`.
+- `Tests/VisionAPITests/` — XCTVapor tests.
+- `Public/Swagger/` — Swagger UI static files; reads `/Swagger/swagger.json`.
+- `.github/workflows/` — `ci.yml` (macOS build/test, web build), `release.yml` (tagged release: macOS tarball + web image to GHCR).
 
-# Stop all services
-docker-compose down
-```
+## Routes
 
-### Testing
-```bash
-# Run all tests
-swift test
+| Path | Controller | Min macOS |
+|---|---|---|
+| `/text-detection/recognize-text`, `/supported-languages` | TextDetectionController | 13 |
+| `/text-detection/recognize-document`, `/vision/lens-smudge` | DocumentController | 26 |
+| `/vision/classify`, `detect-objects`, `scan-barcode`, `detect-faces`, `detect-body-pose`, `detect-hand-pose`, `saliency`, `detect-rectangles`, `detect-horizon` | VisionAnalysisController | 13 |
+| `/vision/aesthetics` | AestheticsController (in ImageFeatureController.swift) | 15 |
+| `/image-feature/background-removal` | ImageFeatureController | 14 |
+| `/pdf/render`, `/pdf/extract-text` | PDFController | 13 |
+| `/speech/transcribe`, `/speech/supported-locales` | SpeechController | 26 |
+| `/translation/translate`, `/translation/supported-languages` | TranslationController | 26 |
 
-# Test specific target
-swift test --filter AppTests
-```
+## Conventions
 
-## Architecture Overview
+- **Inputs**: always go through `InputResolver`. `InputResolver.image(from:)` handles `imageFile` / `imagePath` / `imageURL` / `imageBase64`; `resolve(from:prefix:label:)` does the same for other prefixes (`pdf`, `audio`). Do not read paths or fetch URLs directly in controllers: the resolver enforces `allowLocalFiles` and `allowPrivateURLs`.
+- **Blocking work**: synchronous Vision / PDFKit / CoreGraphics calls run inside `Offload.run(req) { ... }` (NIO thread pool). Never call `.wait()` in a handler.
+- **Errors**: throw `Abort`. 400 for bad input, 403 for disabled input modes, 422 when the file cannot be processed or contains nothing usable. Use `VisionSupport.perform` to map Vision errors to 422. Do not return errors inside a 200 body.
+- **Availability gating**: annotate the controller with `@available(macOS N, *)` and register it under `if #available` in `routes.swift`. Code using macOS 26 SDK symbols must also be wrapped in `#if compiler(>=6.2)` so older Xcode versions still build. Update `Capabilities.current` when adding a gated feature.
+- **OpenAPI**: every route gets `.openAPI(...)`; request models used only for documentation are marked `@OpenAPIDescriptable`.
+- **Coordinates**: normalized 0–1, origin bottom-left (`BoundingBox`, `Point2D`, `KeyPoint`).
+- **Config**: `ServiceConfig` is read from `VISION_API_KEY`, `VISION_ALLOW_LOCAL_FILES`, `VISION_ALLOW_PRIVATE_URLS`, `VISION_MAX_BODY_SIZE`. Tests inject it via `configure(app, config:)`.
 
-### Route Structure
-- **Root Path**: `/` → Redirects to Swagger UI
-- **Text Detection**: `/text-detection/recognize-text` → OCR functionality
-- **Image Features**: `/image-feature/background-removal` → Background removal (macOS 15.0+)
-- **Documentation**: `/Swagger/index.html` → Auto-generated API docs
+## Adding a feature
 
-### Controller Architecture
-The application follows a controller-based architecture:
-
-1. **TextDetectionController**: Handles OCR operations using VNRecognizeTextRequest
-2. **ImageFeatureController**: Handles background removal using VNGenerateForegroundInstanceMaskRequest (macOS 15.0+)
-3. **OpenAPIController**: Generates Swagger documentation
-
-### Request Handling Pattern
-All controllers support multiple image input methods:
-- **File Upload**: `imageFile` parameter (multipart/form-data)
-- **Local Path**: `imagePath` parameter  
-- **Remote URL**: `imageURL` parameter
-- **Base64**: `imageBase64` parameter
-
-### Vision Framework Integration
-- **OCR**: Uses `VNImageRequestHandler` with `VNRecognizeTextRequest`
-  - Supports multiple languages via `recognitionLanguages` 
-  - Configurable accuracy with `recognitionLevel` (0=accurate, 1=fast)
-- **Background Removal**: Uses `VNGenerateForegroundInstanceMaskRequest`
-  - Returns PNG with transparent background
-  - Requires macOS 15.0+
-
-### Configuration
-- **Max Request Size**: 20MB (configured in routes.swift)
-- **Static Files**: Served from Public/ directory
-- **Default Response**: Redirect to Swagger UI
-
-## Key Implementation Details
-
-### Error Handling
-- Uses Vapor's `Abort` for HTTP errors
-- Validates image data before processing
-- Handles Vision framework errors gracefully
-
-### Async/Await Pattern
-All request handlers use `@Sendable` async functions for concurrency safety.
-
-### OpenAPI Integration
-- Auto-generates API documentation using VaporToOpenAPI
-- Controllers use `.openAPI()` modifiers for endpoint documentation
-- Request/response models conform to `@OpenAPIDescriptable`
-
-### Platform Availability
-- Core OCR features: macOS 13.0+
-- Background removal: macOS 15.0+ (feature-gated in routes.swift)
-
-## Development Guidelines
-
-### Adding New Vision Features
-1. Create new controller in `Sources/App/Controllers/`
-2. Define request/response models with `@OpenAPIDescriptable`
-3. Register routes in `routes.swift` with version checks if needed
-4. Use consistent error handling patterns from existing controllers
-
-### Testing Image Processing
-- Test with various image formats (PNG, JPEG, HEIC)
-- Verify multipart form data handling
-- Test error conditions (invalid images, network failures)
-- Validate Vision framework integration
-
-### API Documentation
-- All endpoints automatically appear in Swagger UI
-- Use `.openAPI()` modifiers for endpoint descriptions
-- Define proper Content-Type headers for responses
+1. Add a controller (or a handler in an existing one) using `InputResolver` and `Offload`.
+2. Register it in `routes.swift` with the right availability check; update `Capabilities`.
+3. Add a test for input validation in `Tests/VisionAPITests/`.
+4. Document it in `README.md` and `API_DOCUMENTATION.md`.
