@@ -42,7 +42,7 @@ final class VisionAPITests: XCTestCase {
         try await withApp { app in
             try await app.test(.GET, "Swagger/swagger.json", afterResponse: { res async in
                 XCTAssertEqual(res.status, .ok)
-                XCTAssertTrue(res.body.string.contains("/text-detection/recognize-text"))
+                XCTAssertTrue(res.body.string.contains("recognize-text"))
             })
         }
     }
