@@ -6,7 +6,7 @@ import VaporToOpenAPI
 /// Swagger UI 静态文件位于 `Public/Swagger/`，它读取同目录下的 `swagger.json`。
 struct OpenAPIController: RouteCollection {
     private static var openAPIVersion: Version {
-        let parts = version.split(separator: ".").compactMap { Int($0) }
+        let parts = version.split(separator: ".").compactMap { UInt($0) }
         guard parts.count == 3 else { return Version(1, 0, 0) }
         return Version(parts[0], parts[1], parts[2])
     }
