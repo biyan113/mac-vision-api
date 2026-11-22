@@ -23,7 +23,7 @@ final class VisionAPITests: XCTestCase {
                 XCTAssertEqual(res.status, .ok)
                 let body = try res.content.decode(HealthStatus.self)
                 XCTAssertEqual(body.status, "healthy")
-                XCTAssertEqual(body.version, version)
+                XCTAssertEqual(body.version, VisionAPI.version)
             })
         }
     }
