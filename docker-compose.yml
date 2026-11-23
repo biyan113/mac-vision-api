@@ -1,30 +1,22 @@
-# Docker Compose file for Vapor
+# Vision API Web 界面
 #
-# Install Docker on your system to run and test
-# your Vapor app in a production-like environment.
+# 后端依赖 Apple Vision / PDFKit / Speech 等 macOS 框架，不能运行在 Linux 容器中。
+# 请先在 Mac 上启动后端（见 README），再用本文件启动 Web 界面：
 #
-# Note: This file is intended for testing and does not
-# implement best practices for a production deployment.
+#   docker compose up -d        # 使用已发布的镜像
+#   docker compose up --build   # 从源码构建
 #
-# Learn more: https://docs.docker.com/compose/reference/
-#
-#   Build images: docker-compose build
-#      Start app: docker-compose up app
-#       Stop all: docker-compose down
-#
-version: '3.7'
-
-x-shared_environment: &shared_environment
-  LOG_LEVEL: ${LOG_LEVEL:-debug}
-  
+# 然后访问 http://localhost:3000
 services:
-  app:
-    image: vision-api:latest
+  web:
+    image: ghcr.io/biyan113/mac-vision-api-web:latest
     build:
-      context: .
+      context: ./vision-web
     environment:
-      <<: *shared_environment
+      # 后端地址。默认指向宿主机 8080 端口
+      VISION_API_UPSTREAM: ${VISION_API_UPSTREAM:-http://host.docker.internal:8080}
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
     ports:
-      - '8080:8080'
-    # user: '0' # uncomment to run as root for testing purposes even though Dockerfile defines 'vapor' user.
-    command: ["serve", "--env", "production", "--hostname", "0.0.0.0", "--port", "8080"]
+      - "3000:80"
+    restart: unless-stopped

@@ -1,6 +1,7 @@
 import React from 'react'
 import { Link } from 'react-router-dom'
-import { FileText, Scissors, Eye, Zap, Shield, Globe } from 'lucide-react'
+import { FileText, Scissors, Eye, Zap, Shield, Globe, ScanSearch, Table, File, Mic, Languages } from 'lucide-react'
+import { getCurrentApiUrl } from '../services/api'
 
 const HomePage: React.FC = () => {
   const features = [
@@ -17,6 +18,41 @@ const HomePage: React.FC = () => {
       icon: Scissors,
       href: '/background-removal',
       color: 'bg-purple-50 text-purple-600 border-purple-200'
+    },
+    {
+      title: '文档结构识别',
+      description: '识别文档中的段落和表格，并提取邮箱、电话等信息，表格可导出为 CSV。需要 macOS 26。',
+      icon: Table,
+      href: '/document',
+      color: 'bg-green-50 text-green-600 border-green-200'
+    },
+    {
+      title: '图像分析',
+      description: '图像分类、物体与人脸检测、条码识别、人体与手部姿态、显著性、矩形检测、美学评分等。',
+      icon: ScanSearch,
+      href: '/analysis',
+      color: 'bg-orange-50 text-orange-600 border-orange-200'
+    },
+    {
+      title: 'PDF 处理',
+      description: '把 PDF 页面渲染为图片，或抽取 PDF 中的文本内容。',
+      icon: File,
+      href: '/pdf',
+      color: 'bg-red-50 text-red-600 border-red-200'
+    },
+    {
+      title: '语音转写',
+      description: '在本机把音频文件转成文字，带时间戳，可导出字幕。需要 macOS 26。',
+      icon: Mic,
+      href: '/speech',
+      color: 'bg-teal-50 text-teal-600 border-teal-200'
+    },
+    {
+      title: '翻译',
+      description: '使用系统翻译语言包在本机翻译文本，不经过任何云服务。需要 macOS 26。',
+      icon: Languages,
+      href: '/translation',
+      color: 'bg-indigo-50 text-indigo-600 border-indigo-200'
     }
   ]
 
@@ -56,7 +92,7 @@ const HomePage: React.FC = () => {
           Vision API
         </h1>
         <p className="text-xl text-notion-text-secondary max-w-3xl mx-auto leading-relaxed">
-          基于 Apple Vision 框架的自托管图像处理 API 服务，提供 OCR 文字识别和背景移除等强大功能
+          把 macOS 自带的本地能力封装成 API 的自托管服务：文字识别、图像分析、背景移除、PDF、语音转写和翻译，全部在本机完成
         </p>
       </div>
 
@@ -150,7 +186,7 @@ const HomePage: React.FC = () => {
         <p className="text-notion-text-secondary text-sm">
           需要 API 接口？访问{' '}
           <a
-            href="http://localhost:8080/Swagger/index.html"
+            href={`${getCurrentApiUrl().replace(/\/$/, '')}/Swagger/index.html`}
             target="_blank"
             rel="noopener noreferrer"
             className="text-notion-blue hover:underline"

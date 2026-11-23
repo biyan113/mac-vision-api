@@ -182,3 +182,56 @@ public enum VisionCoreError: LocalizedError, Sendable {
         }
     }
 }
+
+// MARK: - 文本中的可操作信息
+
+/// 从文本中识别出的链接、电话、日期或地址
+public struct TextInsight: Codable, Sendable, Equatable {
+    public enum Kind: String, Codable, Sendable {
+        case link
+        case phoneNumber
+        case date
+        case address
+    }
+
+    public var kind: Kind
+    /// 原文中的片段
+    public var value: String
+    /// 可以直接打开的地址（网页、tel: 或地图链接），没有时为 nil
+    public var url: String?
+
+    public init(kind: Kind, value: String, url: String?) {
+        self.kind = kind
+        self.value = value
+        self.url = url
+    }
+}
+
+// MARK: - 隐私打码
+
+/// 需要打码的内容类型
+public struct RedactionTargets: OptionSet, Sendable {
+    public let rawValue: Int
+
+    public init(rawValue: Int) {
+        self.rawValue = rawValue
+    }
+
+    public static let faces = RedactionTargets(rawValue: 1 << 0)
+    public static let text = RedactionTargets(rawValue: 1 << 1)
+    public static let barcodes = RedactionTargets(rawValue: 1 << 2)
+    public static let all: RedactionTargets = [.faces, .text, .barcodes]
+}
+
+/// 打码结果
+public struct RedactionResult: Sendable {
+    /// 打码后的图片（PNG）
+    public var pngData: Data
+    /// 被打码的区域
+    public var regions: [BoundingBox]
+
+    public init(pngData: Data, regions: [BoundingBox]) {
+        self.pngData = pngData
+        self.regions = regions
+    }
+}

@@ -8,6 +8,19 @@ enum VisionFeature: Int, CaseIterable, Sendable {
     case classify
     case detectObjects
     case barcode
+    case redact
+
+    /// 侧边栏和工具栏使用的 SF Symbols 图标名
+    var symbolName: String {
+        switch self {
+        case .ocr: return "text.viewfinder"
+        case .backgroundRemoval: return "person.crop.rectangle"
+        case .classify: return "tag"
+        case .detectObjects: return "viewfinder"
+        case .barcode: return "qrcode.viewfinder"
+        case .redact: return "eye.slash"
+        }
+    }
 
     var title: String {
         switch self {
@@ -16,6 +29,7 @@ enum VisionFeature: Int, CaseIterable, Sendable {
         case .classify: return L("图像分类", "Classify")
         case .detectObjects: return L("物体检测", "Detect Objects")
         case .barcode: return L("条码识别", "Barcodes")
+        case .redact: return L("隐私打码", "Redact")
         }
     }
 
@@ -23,7 +37,7 @@ enum VisionFeature: Int, CaseIterable, Sendable {
     var outputExtension: String {
         switch self {
         case .ocr: return "txt"
-        case .backgroundRemoval: return "png"
+        case .backgroundRemoval, .redact: return "png"
         case .classify, .detectObjects, .barcode: return "json"
         }
     }
@@ -47,6 +61,8 @@ struct AnalysisOutput: Sendable {
     var boxes: [OverlayBox] = []
     /// 与 HTTP API 响应字段一致的 JSON
     var json: Data?
+    /// 从结果文字里找到的链接、电话、日期和地址
+    var insights: [TextInsight] = []
 
     var text: String {
         lines.joined(separator: "\n")
@@ -55,6 +71,26 @@ struct AnalysisOutput: Sendable {
     /// 文本行与检测框是否一一对应
     var linksLinesToBoxes: Bool {
         !boxes.isEmpty && boxes.count == lines.count
+    }
+}
+
+/// 一次处理用到的全部选项
+struct AnalysisOptions: Sendable {
+    var text = TextRecognitionOptions()
+    var redaction: RedactionTargets = .all
+}
+
+/// 隐私打码可选的对象
+enum RedactionChoice {
+    static let options: [(title: String, targets: RedactionTargets)] = [
+        (L("人脸、文字和条码", "Faces, Text & Barcodes"), .all),
+        (L("仅人脸", "Faces Only"), .faces),
+        (L("仅文字", "Text Only"), .text),
+        (L("仅条码", "Barcodes Only"), .barcodes),
+    ]
+
+    static func targets(at index: Int) -> RedactionTargets {
+        options.indices.contains(index) ? options[index].targets : .all
     }
 }
 
@@ -86,17 +122,18 @@ enum Analyzer {
     static func run(
         _ feature: VisionFeature,
         imageData: Data,
-        options: TextRecognitionOptions
+        options: AnalysisOptions
     ) throws -> AnalysisOutput {
         switch feature {
         case .ocr:
-            let lines = try VisionEngine.recognizeText(imageData: imageData, options: options)
+            let lines = try VisionEngine.recognizeText(imageData: imageData, options: options.text)
             let text = lines.map { $0.text }.joined(separator: "\n")
             return AnalysisOutput(
                 lines: lines.map { $0.text },
                 emptyMessage: L("（没有识别到文字）", "(No text recognized)"),
                 boxes: lines.map { OverlayBox(rect: $0.boundingBox.cgRect, label: "") },
-                json: encode(TextExport(text: text, lines: lines))
+                json: encode(TextExport(text: text, lines: lines)),
+                insights: TextInsights.detect(in: text)
             )
 
         case .backgroundRemoval:
@@ -133,7 +170,15 @@ enum Analyzer {
                 boxes: barcodes.map {
                     OverlayBox(rect: $0.boundingBox.cgRect, label: shortSymbology($0.symbology))
                 },
-                json: encode(BarcodeResponse(barcodes: barcodes))
+                json: encode(BarcodeResponse(barcodes: barcodes)),
+                insights: TextInsights.detect(in: barcodes.map { $0.payload }.joined(separator: "\n"))
+            )
+
+        case .redact:
+            let result = try Redactor.redact(imageData: imageData, targets: options.redaction)
+            return AnalysisOutput(
+                imageData: result.pngData,
+                boxes: result.regions.map { OverlayBox(rect: $0.cgRect, label: "") }
             )
         }
     }

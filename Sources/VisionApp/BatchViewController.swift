@@ -45,7 +45,7 @@ final class BatchViewController: NSViewController, NSTableViewDataSource, NSTabl
     private var isCancelled = false
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 720, height: 480))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 860, height: 640))
     }
 
     override func viewDidLoad() {
@@ -141,7 +141,6 @@ final class BatchViewController: NSViewController, NSTableViewDataSource, NSTabl
         NSLayoutConstraint.activate([
             bottomRow.bottomAnchor.constraint(equalTo: view.bottomAnchor, constant: -16),
             scrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 200),
-            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 680),
         ])
 
         refresh()
@@ -247,9 +246,11 @@ final class BatchViewController: NSViewController, NSTableViewDataSource, NSTabl
             return
         }
         let feature = VisionFeature(rawValue: featurePopup.indexOfSelectedItem) ?? .ocr
-        let options = TextRecognitionOptions(
-            languages: OCRLanguage.codes(at: Settings.ocrLanguageIndex),
-            fast: Settings.ocrFastMode
+        let options = AnalysisOptions(
+            text: TextRecognitionOptions(
+                languages: OCRLanguage.codes(at: Settings.ocrLanguageIndex),
+                fast: Settings.ocrFastMode
+            )
         )
 
         for index in items.indices {
@@ -333,7 +334,7 @@ enum BatchProcessor {
     static func process(
         url: URL,
         feature: VisionFeature,
-        options: TextRecognitionOptions,
+        options: AnalysisOptions,
         outputDirectory: URL
     ) throws -> String {
         let data = try Data(contentsOf: url)
@@ -380,7 +381,7 @@ enum BatchProcessor {
         switch feature {
         case .ocr:
             data = Data(output.text.utf8)
-        case .backgroundRemoval:
+        case .backgroundRemoval, .redact:
             data = output.imageData ?? Data()
         case .classify, .detectObjects, .barcode:
             data = output.json ?? Data("{}".utf8)

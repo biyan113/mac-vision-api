@@ -105,6 +105,37 @@ final class VisionCoreTests: XCTestCase {
         XCTAssertEqual(barcodes.first?.payload, "https://example.com/vision")
     }
 
+    // MARK: - 新增工具
+
+    func testTextInsights() {
+        let insights = TextInsights.detect(in: "官网 https://example.com/vision 电话 010-12345678")
+        XCTAssertTrue(insights.contains { $0.kind == .link && ($0.url ?? "").contains("example.com") })
+    }
+
+    func testRedactionProducesPNG() throws {
+        let image = try makeQRCode("https://example.com/vision")
+        let result = try Redactor.redact(imageData: image, targets: .barcodes)
+        XCTAssertEqual(Array(result.pngData.prefix(4)), [0x89, 0x50, 0x4E, 0x47])
+        XCTAssertFalse(result.regions.isEmpty)
+        // 打码后二维码应当无法再被识别
+        XCTAssertTrue(try VisionEngine.scanBarcodes(imageData: result.pngData).isEmpty)
+    }
+
+    func testRedactionWithoutTargetsKeepsImage() throws {
+        let result = try Redactor.redact(imageData: try makeTextImage("HELLO"), targets: [])
+        XCTAssertTrue(result.regions.isEmpty)
+        XCTAssertEqual(Array(result.pngData.prefix(4)), [0x89, 0x50, 0x4E, 0x47])
+    }
+
+    func testSearchablePDFContainsRecognizedText() throws {
+        let image = try makeTextImage("HELLO VISION")
+        let pdf = try SearchablePDF.make(imageData: image, options: TextRecognitionOptions(languages: ["en-US"]))
+        XCTAssertTrue(PDFEngine.looksLikePDF(pdf))
+        XCTAssertEqual(try PDFEngine.pageCount(pdfData: pdf), 1)
+        let text = try PDFEngine.extractText(pdfData: pdf, mergePages: true).allText ?? ""
+        XCTAssertTrue(text.uppercased().contains("HELLO"), "PDF 文本层：\(text)")
+    }
+
     // MARK: - PDF
 
     func testPDFDetection() throws {

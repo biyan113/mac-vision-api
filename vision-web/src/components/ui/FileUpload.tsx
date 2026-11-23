@@ -11,6 +11,9 @@ interface FileUploadProps {
   maxSize?: number
   className?: string
   disabled?: boolean
+  /** 上传区域的提示文字，默认针对图片 */
+  label?: string
+  hint?: string
 }
 
 const FileUpload: React.FC<FileUploadProps> = ({
@@ -22,7 +25,9 @@ const FileUpload: React.FC<FileUploadProps> = ({
   },
   maxSize = 20 * 1024 * 1024, // 20MB
   className,
-  disabled = false
+  disabled = false,
+  label = '点击上传或拖拽图片',
+  hint = '支持 PNG、JPG、JPEG、WebP、HEIC 格式'
 }) => {
   const onDrop = useCallback((acceptedFiles: File[]) => {
     if (acceptedFiles.length > 0) {
@@ -64,10 +69,10 @@ const FileUpload: React.FC<FileUploadProps> = ({
           <Upload className="w-12 h-12 mx-auto mb-4 text-notion-text-light" />
           <div className="space-y-2">
             <p className="text-notion-text font-medium">
-              {isDragActive ? '拖放图片到这里' : '点击上传或拖拽图片'}
+              {isDragActive ? '松开以上传' : label}
             </p>
             <p className="text-notion-text-secondary text-sm">
-              支持 PNG、JPG、JPEG、WebP、HEIC 格式，最大 {formatFileSize(maxSize)}
+              {hint}，最大 {formatFileSize(maxSize)}
             </p>
           </div>
         </div>

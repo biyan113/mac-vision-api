@@ -42,6 +42,8 @@ enum Settings {
         static let serverPort = "serverPort"
         static let startServerAtLaunch = "startServerAtLaunch"
         static let hidesMenuBarIcon = "hidesMenuBarIcon"
+        static let serverAPIKey = "serverAPIKey"
+        static let disablesGlobalHotKey = "disablesGlobalHotKey"
     }
 
     static var interfaceLanguage: InterfaceLanguage {
@@ -86,6 +88,18 @@ enum Settings {
     static var startServerAtLaunch: Bool {
         get { UserDefaults.standard.bool(forKey: Key.startServerAtLaunch) }
         set { UserDefaults.standard.set(newValue, forKey: Key.startServerAtLaunch) }
+    }
+
+    /// 内嵌 API 服务的访问密钥，空字符串表示不启用鉴权
+    static var serverAPIKey: String {
+        get { UserDefaults.standard.string(forKey: Key.serverAPIKey) ?? "" }
+        set { UserDefaults.standard.set(newValue, forKey: Key.serverAPIKey) }
+    }
+
+    /// 是否启用全局快捷键（⌃⌥⌘O）截屏识别
+    static var usesGlobalHotKey: Bool {
+        get { !UserDefaults.standard.bool(forKey: Key.disablesGlobalHotKey) }
+        set { UserDefaults.standard.set(!newValue, forKey: Key.disablesGlobalHotKey) }
     }
 
     static var showsMenuBarIcon: Bool {

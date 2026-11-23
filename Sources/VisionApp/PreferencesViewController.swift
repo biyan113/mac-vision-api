@@ -4,6 +4,8 @@ import AppKit
 final class PreferencesViewController: NSViewController {
     /// 菜单栏图标开关变化时调用
     var onMenuBarIconChanged: (() -> Void)?
+    /// 全局快捷键开关变化时调用
+    var onGlobalHotKeyChanged: (() -> Void)?
 
     private let featurePopup = NSPopUpButton(frame: .zero, pullsDown: false)
     private let ocrLanguagePopup = NSPopUpButton(frame: .zero, pullsDown: false)
@@ -19,8 +21,22 @@ final class PreferencesViewController: NSViewController {
         action: nil
     )
 
+    private let hotKeyCheckbox = NSButton(
+        checkboxWithTitle: L(
+            "启用全局快捷键 \(GlobalHotKey.displayName)：截屏识别并复制文字",
+            "Enable global shortcut \(GlobalHotKey.displayName): capture, recognize and copy text"
+        ),
+        target: nil,
+        action: nil
+    )
+    private let autoStartCheckbox = NSButton(
+        checkboxWithTitle: L("启动应用时自动开启 API 服务", "Start the API server when the app launches"),
+        target: nil,
+        action: nil
+    )
+
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 480, height: 260))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 520, height: 340))
     }
 
     override func viewDidLoad() {
@@ -43,8 +59,14 @@ final class PreferencesViewController: NSViewController {
 
         fastCheckbox.state = Settings.ocrFastMode ? .on : .off
         menuBarCheckbox.state = Settings.showsMenuBarIcon ? .on : .off
+        hotKeyCheckbox.state = Settings.usesGlobalHotKey ? .on : .off
+        autoStartCheckbox.state = Settings.startServerAtLaunch ? .on : .off
 
-        for control in [featurePopup, ocrLanguagePopup, interfaceLanguagePopup, fastCheckbox, menuBarCheckbox] as [NSControl] {
+        let controls: [NSControl] = [
+            featurePopup, ocrLanguagePopup, interfaceLanguagePopup,
+            fastCheckbox, menuBarCheckbox, hotKeyCheckbox, autoStartCheckbox,
+        ]
+        for control in controls {
             control.target = self
             control.action = #selector(settingChanged(_:))
         }
@@ -56,8 +78,8 @@ final class PreferencesViewController: NSViewController {
         languageRow.spacing = 8
 
         let note = NSTextField(wrappingLabelWithString: L(
-            "默认功能和识别语言在下次打开主窗口时生效，批量处理始终使用这里的识别语言。服务地址和端口在「API 服务」窗口中设置。",
-            "The default feature and recognition language apply the next time the main window opens; batch processing always uses the language set here. The server address and port are set in the “API Server” window."
+            "默认功能和识别语言在下次启动应用时生效，批量处理始终使用这里的识别语言。服务地址、端口和访问密钥在侧边栏的「API 服务」里设置。",
+            "The default feature and recognition language apply the next time the app launches; batch processing always uses the language set here. The server address, port and API key are set under “API Server” in the sidebar."
         ))
         note.textColor = .secondaryLabelColor
         note.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -68,6 +90,8 @@ final class PreferencesViewController: NSViewController {
             [NSGridCell.emptyContentView, fastCheckbox],
             [NSTextField(labelWithString: L("界面语言", "Interface language")), languageRow],
             [NSGridCell.emptyContentView, menuBarCheckbox],
+            [NSGridCell.emptyContentView, hotKeyCheckbox],
+            [NSGridCell.emptyContentView, autoStartCheckbox],
         ])
         grid.column(at: 0).xPlacement = .trailing
         grid.rowSpacing = 10
@@ -98,6 +122,14 @@ final class PreferencesViewController: NSViewController {
         let languageIndex = interfaceLanguagePopup.indexOfSelectedItem
         if languages.indices.contains(languageIndex) {
             Settings.interfaceLanguage = languages[languageIndex]
+        }
+
+        Settings.startServerAtLaunch = autoStartCheckbox.state == .on
+
+        let usesGlobalHotKey = hotKeyCheckbox.state == .on
+        if usesGlobalHotKey != Settings.usesGlobalHotKey {
+            Settings.usesGlobalHotKey = usesGlobalHotKey
+            onGlobalHotKeyChanged?()
         }
 
         let showsMenuBarIcon = menuBarCheckbox.state == .on

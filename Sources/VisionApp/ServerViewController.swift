@@ -1,13 +1,13 @@
 import AppKit
-import VisionServer
 
 /// 内嵌 API 服务面板：启动与停止、地址设置、运行日志
 final class ServerViewController: NSViewController {
     private let statusLabel = NSTextField(labelWithString: "")
     private let hostField = NSTextField(string: "")
     private let portField = NSTextField(string: "")
+    private let apiKeyField = NSSecureTextField(string: "")
     private let toggleButton = NSButton(title: "", target: nil, action: nil)
-    private let openButton = NSButton(title: L("在浏览器中打开", "Open in Browser"), target: nil, action: nil)
+    private let openButton = NSButton(title: L("打开接口文档", "Open API Docs"), target: nil, action: nil)
     private let autoStartCheckbox = NSButton(
         checkboxWithTitle: L("启动应用时自动开启服务", "Start the server when the app launches"),
         target: nil,
@@ -20,7 +20,7 @@ final class ServerViewController: NSViewController {
     }
 
     override func loadView() {
-        view = NSView(frame: NSRect(x: 0, y: 0, width: 640, height: 440))
+        view = NSView(frame: NSRect(x: 0, y: 0, width: 860, height: 640))
     }
 
     override func viewDidLoad() {
@@ -33,6 +33,8 @@ final class ServerViewController: NSViewController {
         hostField.placeholderString = "127.0.0.1"
         portField.stringValue = String(Settings.serverPort)
         portField.placeholderString = "8080"
+        apiKeyField.stringValue = Settings.serverAPIKey
+        apiKeyField.placeholderString = L("留空则不需要密钥", "Leave empty for no key")
 
         toggleButton.target = self
         toggleButton.action = #selector(toggleServer(_:))
@@ -60,9 +62,16 @@ final class ServerViewController: NSViewController {
         addressRow.orientation = .horizontal
         addressRow.spacing = 8
 
+        let keyLabel = NSTextField(labelWithString: L("访问密钥", "API Key"))
+        let keySpacer = NSView()
+        keySpacer.setContentHuggingPriority(.init(1), for: .horizontal)
+        let keyRow = NSStackView(views: [keyLabel, apiKeyField, keySpacer])
+        keyRow.orientation = .horizontal
+        keyRow.spacing = 8
+
         let hint = NSTextField(wrappingLabelWithString: L(
-            "监听 127.0.0.1 时只有本机可以访问；改为 0.0.0.0 后同一网络内的其他设备也能访问，接口没有身份验证。",
-            "With 127.0.0.1 only this Mac can connect. With 0.0.0.0 other devices on your network can connect too; the API has no authentication."
+            "监听 127.0.0.1 时只有本机可以访问；改为 0.0.0.0 后同一网络内的其他设备也能访问，此时建议设置访问密钥。设置后，请求需要携带 Authorization: Bearer <密钥> 或 X-API-Key: <密钥>。",
+            "With 127.0.0.1 only this Mac can connect. With 0.0.0.0 other devices on your network can connect too, so set an API key. Requests must then send Authorization: Bearer <key> or X-API-Key: <key>."
         ))
         hint.textColor = .secondaryLabelColor
         hint.font = NSFont.systemFont(ofSize: NSFont.smallSystemFontSize)
@@ -74,7 +83,7 @@ final class ServerViewController: NSViewController {
         let logRow = NSStackView(views: [logLabel, logSpacer, clearButton])
         logRow.orientation = .horizontal
 
-        let rows: [NSView] = [statusLabel, addressRow, hint, autoStartCheckbox, logRow, logScrollView]
+        let rows: [NSView] = [statusLabel, addressRow, keyRow, hint, autoStartCheckbox, logRow, logScrollView]
         var previous: NSView?
         for row in rows {
             row.translatesAutoresizingMaskIntoConstraints = false
@@ -95,7 +104,7 @@ final class ServerViewController: NSViewController {
             logScrollView.heightAnchor.constraint(greaterThanOrEqualToConstant: 160),
             hostField.widthAnchor.constraint(equalToConstant: 130),
             portField.widthAnchor.constraint(equalToConstant: 70),
-            view.widthAnchor.constraint(greaterThanOrEqualToConstant: 600),
+            apiKeyField.widthAnchor.constraint(equalToConstant: 260),
         ])
 
         NotificationCenter.default.addObserver(
@@ -134,6 +143,7 @@ final class ServerViewController: NSViewController {
         }
         Settings.serverHostname = host
         Settings.serverPort = port
+        Settings.serverAPIKey = apiKeyField.stringValue.trimmingCharacters(in: .whitespaces)
         hostField.stringValue = Settings.serverHostname
         return true
     }
@@ -179,6 +189,7 @@ final class ServerViewController: NSViewController {
         let isStopped = controller.state == .stopped
         hostField.isEnabled = isStopped
         portField.isEnabled = isStopped
+        apiKeyField.isEnabled = isStopped
         openButton.isEnabled = controller.isRunning
 
         switch controller.state {

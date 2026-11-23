@@ -1,6 +1,7 @@
 import React from 'react'
 import { NavLink } from 'react-router-dom'
-import { FileText, Scissors, Home, ExternalLink, File } from 'lucide-react'
+import { FileText, Scissors, Home, ExternalLink, File, ScanSearch, Table, Mic, Languages } from 'lucide-react'
+import { getCurrentApiUrl } from '../../services/api'
 import { cn } from '../../lib/utils'
 
 interface SidebarProps {
@@ -20,6 +21,16 @@ const navigation = [
     icon: FileText
   },
   {
+    name: '文档结构识别',
+    href: '/document',
+    icon: Table
+  },
+  {
+    name: '图像分析',
+    href: '/analysis',
+    icon: ScanSearch
+  },
+  {
     name: '背景移除',
     href: '/background-removal',
     icon: Scissors
@@ -28,6 +39,16 @@ const navigation = [
     name: 'PDF 处理',
     href: '/pdf',
     icon: File
+  },
+  {
+    name: '语音转写',
+    href: '/speech',
+    icon: Mic
+  },
+  {
+    name: '翻译',
+    href: '/translation',
+    icon: Languages
   }
 ]
 
@@ -82,7 +103,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
           <div className="px-4 py-6 border-t border-notion-border">
             <div className="space-y-3">
               <a
-                href="http://localhost:8080/Swagger/index.html"
+                href={`${getCurrentApiUrl().replace(/\/$/, '')}/Swagger/index.html`}
                 target="_blank"
                 rel="noopener noreferrer"
                 className="flex items-center px-3 py-2 text-sm text-notion-text-secondary hover:text-notion-text hover:bg-notion-bg-hover rounded-notion-sm notion-transition"

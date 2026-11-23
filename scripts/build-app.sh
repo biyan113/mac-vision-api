@@ -18,11 +18,14 @@ APP_DIR=".build/VisionApp.app"
 ZIP_PATH=".build/VisionApp-${APP_VERSION}.zip"
 
 swift build -c release --product VisionApp
+swift build -c release --product VisionMCP
 BIN_DIR="$(swift build -c release --show-bin-path)"
 
 rm -rf "$APP_DIR"
 mkdir -p "$APP_DIR/Contents/MacOS" "$APP_DIR/Contents/Resources"
 cp "$BIN_DIR/VisionApp" "$APP_DIR/Contents/MacOS/VisionApp"
+# 供 AI 助手调用的 MCP 服务，随应用一起分发
+cp "$BIN_DIR/VisionMCP" "$APP_DIR/Contents/MacOS/VisionMCP"
 
 # 内嵌 API 服务需要的静态文件
 if [ -d Public ]; then
@@ -89,9 +92,12 @@ ${ICON_PLIST}
 </plist>
 PLIST
 
+# 先签名包内的附加可执行文件，再签名整个应用
 if [ -n "${CODESIGN_IDENTITY:-}" ]; then
+    codesign --force --options runtime --timestamp --sign "$CODESIGN_IDENTITY" "$APP_DIR/Contents/MacOS/VisionMCP"
     codesign --force --options runtime --timestamp --sign "$CODESIGN_IDENTITY" "$APP_DIR"
 else
+    codesign --force --sign - "$APP_DIR/Contents/MacOS/VisionMCP"
     codesign --force --sign - "$APP_DIR"
 fi
 
@@ -109,3 +115,4 @@ fi
 echo "已生成 $APP_DIR"
 echo "分发包 $ZIP_PATH"
 echo "运行：open $APP_DIR"
+echo "MCP 服务：$APP_DIR/Contents/MacOS/VisionMCP"

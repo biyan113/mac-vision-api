@@ -1,5 +1,4 @@
 import AppKit
-import VisionServer
 
 /// 管理内嵌 API 服务的启动与停止，并把状态变化通知给界面
 @MainActor
@@ -36,10 +35,10 @@ final class ServerController {
         state == .running
     }
 
-    /// 浏览器中访问服务用的地址
+    /// 浏览器中查看接口文档用的地址
     var baseURL: URL? {
         let host = hostname == "0.0.0.0" ? "127.0.0.1" : hostname
-        return URL(string: "http://\(host):\(port)/")
+        return URL(string: "http://\(host):\(port)/Swagger/index.html")
     }
 
     var statusText: String {
@@ -65,9 +64,15 @@ final class ServerController {
         state = .starting
 
         let workingDirectory = ServerController.publicWorkingDirectory()
+        let apiKey = Settings.serverAPIKey
         Task {
             do {
-                try await self.server.start(hostname: host, port: portNumber, workingDirectory: workingDirectory)
+                try await self.server.start(
+                    hostname: host,
+                    port: portNumber,
+                    apiKey: apiKey.isEmpty ? nil : apiKey,
+                    workingDirectory: workingDirectory
+                )
                 self.state = .running
             } catch {
                 self.lastError = "\(error)"
