@@ -48,6 +48,21 @@ For more feature visit: [Vision Framwork](https://developer.apple.com/documentat
 
    This will start the local server, which will listen on `http://localhost:8080` by default.
 
+### Desktop App (AppKit)
+
+A native AppKit GUI is also included. It calls the Vision framework directly, so the HTTP server does not need to be running.
+
+```bash
+# Run directly
+swift run VisionApp
+
+# Or build a double-clickable bundle at .build/VisionApp.app
+./scripts/build-app.sh
+open .build/VisionApp.app
+```
+
+Open, drag in, or paste (⌘V) an image, then pick a feature: text recognition, background removal (macOS 14+), image classification, object detection, or barcode scanning. Results can be copied or saved.
+
 ### Using the API
 
 Once the server is running, you can send HTTP requests to interact with the API.

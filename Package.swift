@@ -24,6 +24,10 @@ let package = Package(
             ],
             swiftSettings: swiftSettings
         ),
+        // AppKit 图形界面，直接调用 Vision 框架，不依赖 Vapor
+        .executableTarget(
+            name: "VisionApp"
+        ),
         .testTarget(
             name: "AppTests",
             dependencies: [

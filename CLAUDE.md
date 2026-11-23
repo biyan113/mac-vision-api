@@ -22,6 +22,12 @@ swift package resolve
 # Run development server (default: localhost:8080)
 swift run App
 
+# Run the AppKit desktop GUI (Sources/VisionApp, calls Vision directly, no server needed)
+swift run VisionApp
+
+# Package the GUI as .build/VisionApp.app
+./scripts/build-app.sh
+
 # Run with specific environment
 swift run App serve --env development --hostname 0.0.0.0 --port 8080
 
