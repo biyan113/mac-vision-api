@@ -1,32 +1,17 @@
-# 多阶段构建 Dockerfile
-FROM node:18-alpine as builder
-
-# 设置工作目录
+# Vision API Web 界面镜像（仅前端）。
+# 后端依赖 Apple Vision 等 macOS 框架，无法运行在容器里，需直接运行在 Mac 上。
+FROM node:20-alpine AS builder
 WORKDIR /app
-
-# 复制 package.json 和 package-lock.json
 COPY package*.json ./
-
-# 安装依赖
-RUN npm ci --only=production
-
-# 复制源代码
+RUN npm ci
 COPY . .
-
-# 构建应用
 RUN npm run build
 
-# 生产阶段
 FROM nginx:alpine
-
-# 复制自定义 nginx 配置
-COPY nginx.conf /etc/nginx/conf.d/default.conf
-
-# 从构建阶段复制构建产物
+# 后端地址，默认指向宿主机上运行的 Vision API
+ENV VISION_API_UPSTREAM=http://host.docker.internal:8080
+# nginx 官方镜像会在启动时对 templates 目录做 envsubst（只替换已定义的环境变量）
+COPY nginx.conf.template /etc/nginx/templates/default.conf.template
 COPY --from=builder /app/dist /usr/share/nginx/html
-
-# 暴露端口
 EXPOSE 80
-
-# 启动 nginx
 CMD ["nginx", "-g", "daemon off;"]

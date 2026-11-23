@@ -1,152 +1,199 @@
-# Vision API 中文文档
+# Vision API 接口文档
 
-## 概述
+基础地址默认为 `http://localhost:8080`。交互式文档在 `/Swagger/index.html`，OpenAPI 规范在 `/Swagger/swagger.json`。
 
-Vision API 是一个自托管的 RESTful 服务，将 Apple 的 Vision 框架能力通过 HTTP 接口对外提供。它支持常见的视觉任务，例如：
-- 文本识别（OCR）
-- 背景移除（前景分割）
+## 通用约定
 
-适合在本地或私有环境中部署，无需依赖第三方云服务。
+### 输入
 
-基础地址（默认）：`http://localhost:8080`
+图片接口接受下列字段之一，按顺序取第一个存在的：
 
-## 接口列表
+| 字段 | 说明 |
+|---|---|
+| `imageFile` | multipart 上传的文件 |
+| `imagePath` | 服务器本地路径，需要 `VISION_ALLOW_LOCAL_FILES=true` |
+| `imageURL` | http/https 地址；默认拒绝回环和内网地址 |
+| `imageBase64` | Base64 字符串，可带 `data:image/png;base64,` 前缀 |
 
-### 1. 文本识别（OCR）
+PDF 接口使用 `pdfFile` / `pdfPath` / `pdfURL` / `pdfBase64`，音频接口使用 `audioFile` / `audioPath` / `audioURL` / `audioBase64`。
 
-从图片中识别并提取文本内容。
+请求体可以是 `multipart/form-data`，不上传文件时也可以是 JSON。
 
-- 接口地址：`POST /text-detection/recognize-text`
-- 功能说明：识别图像中的文本，支持多语言（含中文、英文等）。
+### 坐标
 
-请求参数（表单 multipart/form-data）：
+所有 `boundingBox` 和点坐标都是 0~1 的归一化值，原点在图像**左下角**（Vision 框架的约定）。人脸关键点的坐标相对于该人脸的 `boundingBox`。
 
-| 参数名 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| imageFile | File | 否* | 待识别的图片文件（PNG、JPEG 等常见格式） |
-| imagePath | String | 否* | 本地图片文件路径 |
-| imageURL | String | 否* | 远程图片 URL |
-| imageBase64 | String | 否* | Base64 编码的图片数据 |
-| recognitionLanguages | String | 否 | 逗号分隔的 ISO 语言代码（如：`zh,en`）。不提供则自动检测语言 |
-| recognitionLevel | Integer | 否 | 识别精度级别：`0` = 精确（默认），`1` = 快速 |
+### 鉴权
 
-注：带星号（*）的图片来源参数需至少提供其中之一。
+设置了 `VISION_API_KEY` 后，除 `/health` 外的接口需要 `Authorization: Bearer <key>` 或 `X-API-Key: <key>`。
 
-成功响应（200）：
+### 错误
+
+错误响应为 `{"error": true, "reason": "..."}`。
+
+| 状态码 | 含义 |
+|---|---|
+| 400 | 缺少输入、参数无效、Base64 或 URL 无效 |
+| 401 | 缺少或错误的 API Key |
+| 403 | 本地路径或内网 URL 未开启 |
+| 409 | 翻译语言包未下载 |
+| 413 | 请求体超过 `VISION_MAX_BODY_SIZE` |
+| 422 | 文件无法解析，或图片中没有可处理的内容 |
+
+## 服务信息
+
+### `GET /health`
+```json
+{"status": "healthy", "version": "1.0.0", "timestamp": "2026-01-01T00:00:00Z"}
+```
+
+### `GET /capabilities`
+返回当前系统上可用的能力，每项为布尔值：`textRecognition`、`pdf`、`imageAnalysis`、`backgroundRemoval`、`aesthetics`、`documentRecognition`、`lensSmudge`、`speechTranscription`、`translation`。
+
+## 文本识别
+
+### `POST /text-detection/recognize-text`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| 图片输入 | — | 见通用约定 |
+| `recognitionLanguages` | String | 逗号分隔的语言代码，如 `zh-Hans,en-US`。省略则自动检测。只填一个中文代码时会自动加上 `en-US` |
+| `recognitionLevel` | Int | `0` 精确（默认），`1` 快速 |
+| `includeLines` | Bool | 为 `true` 时返回 `lines` |
 
 ```json
 {
-  "text": "从图片中提取的文本内容"
+  "text": "第一行\n第二行",
+  "lines": [
+    {"text": "第一行", "confidence": 0.98, "boundingBox": {"x": 0.1, "y": 0.8, "width": 0.5, "height": 0.05}}
+  ]
 }
 ```
 
-错误响应示例：
+### `GET /text-detection/supported-languages?recognitionLevel=0`
+```json
+{"languages": ["en-US", "zh-Hans", "zh-Hant", "ja-JP"]}
+```
+
+### `POST /text-detection/recognize-document`（macOS 26+）
+识别文档结构。
+```json
+{
+  "text": "全文",
+  "paragraphs": ["段落一", "段落二"],
+  "tables": [{"rows": [["姓名", "电话"], ["张三", "123456"]]}],
+  "emails": ["a@example.com"],
+  "phoneNumbers": ["123456"]
+}
+```
+
+## 图像分析
+
+以下接口的输入都是图片输入。
+
+| 接口 | 额外参数 | 返回 |
+|---|---|---|
+| `POST /vision/classify` | `maxResults`（默认 10） | `{"classifications": [{"identifier", "confidence"}]}` |
+| `POST /vision/detect-objects` | — | `{"objects": [{"label", "confidence", "boundingBox"}]}`，`label` 为动物类别、`face` 或 `human` |
+| `POST /vision/scan-barcode` | — | `{"barcodes": [{"payload", "symbology", "boundingBox"}]}` |
+| `POST /vision/detect-faces` | — | `{"faces": [{"boundingBox", "confidence", "roll", "yaw", "pitch", "landmarks"}]}` |
+| `POST /vision/detect-body-pose` | — | `{"poses": [{"confidence", "joints"}]}` |
+| `POST /vision/detect-hand-pose` | `maxHands`（默认 2） | `{"poses": [{"confidence", "chirality", "joints"}]}` |
+| `POST /vision/saliency` | `type`：`attention`（默认）或 `objectness` | `{"type", "regions": [{"boundingBox", "confidence"}]}` |
+| `POST /vision/detect-rectangles` | `maxResults`（默认 10） | `{"rectangles": [{"confidence", "boundingBox", "topLeft", "topRight", "bottomLeft", "bottomRight"}]}` |
+| `POST /vision/detect-horizon` | — | `{"detected", "angleRadians", "angleDegrees"}` |
+| `POST /vision/aesthetics`（macOS 15+） | — | `{"overallScore", "isUtility"}`，分数范围 -1~1 |
+| `POST /vision/lens-smudge`（macOS 26+） | — | `{"confidence"}`，越接近 1 越可能有污渍 |
+
+`landmarks` 是区域名到点数组的映射，区域包括 `faceContour`、`leftEye`、`rightEye`、`leftEyebrow`、`rightEyebrow`、`nose`、`noseCrest`、`medianLine`、`outerLips`、`innerLips`、`leftPupil`、`rightPupil`。
+
+`joints` 是关节名到 `{"x", "y", "confidence"}` 的映射，关节名使用 Vision 框架的原始标识。
+
+## 背景移除
+
+### `POST /image-feature/background-removal`（macOS 14+）
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| 图片输入 | — | 见通用约定 |
+| `crop` | Bool | 是否裁剪到主体范围，默认 `true` |
+
+返回 `image/png`，背景透明。图片中没有前景主体时返回 422。
+
+## PDF
+
+### `POST /pdf/render`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| PDF 输入 | — | `pdfFile` / `pdfPath` / `pdfURL` / `pdfBase64` |
+| `pageIndex` | Int | 页码，从 0 开始，默认 0 |
+| `dpi` | Double | 36~600，默认 150，超出范围会被截断 |
+
+返回 `image/png`。
+
+### `POST /pdf/extract-text`
+
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| PDF 输入 | — | 同上 |
+| `startPage` / `endPage` | Int | 从 0 开始，默认全部页 |
+| `mergePages` | Bool | 为 `true` 时返回 `allText` |
 
 ```json
 {
-  "error": true,
-  "reason": "请提供图片文件、本地路径、远程URL或Base64编码数据其中之一"
+  "totalPages": 3,
+  "extractedPages": [{"pageNumber": 1, "text": "..."}],
+  "allText": "..."
 }
 ```
 
-示例（curl）：
+只抽取 PDF 的文本层。扫描件请先用 `/pdf/render` 渲染，再调用 OCR。
 
-```bash
-# 使用本地文件
-curl -X POST http://localhost:8080/text-detection/recognize-text \
-  -F "imageFile=@/path/to/your/image.jpg"
+## 语音转写（macOS 26+）
 
-# 使用远程 URL
-curl -X POST http://localhost:8080/text-detection/recognize-text \
-  -F "imageURL=https://example.com/image.jpg"
+### `POST /speech/transcribe`
 
-# 使用 Base64 图片
-curl -X POST http://localhost:8080/text-detection/recognize-text \
-  -F "imageBase64=data:image/jpeg;base64,/9j/4AAQSkZJRgABAQEAYABgAAD/2wBDAAIBAQIB..."
-
-# 搭配可选参数
-curl -X POST http://localhost:8080/text-detection/recognize-text \
-  -F "imageFile=@/path/to/your/image.jpg" \
-  -F "recognitionLanguages=en,zh" \
-  -F "recognitionLevel=0"
-```
-
-### 2. 背景移除
-
-移除图片背景，仅保留前景主体。
-
-- 接口地址：`POST /image-feature/background-removal`
-- 功能说明：对传入图片执行前景分割并输出去背景 PNG 图像。
-
-请求参数（表单 multipart/form-data）：
-
-| 参数名 | 类型 | 必填 | 说明 |
-|---|---|---|---|
-| imageFile | File | 是 | 待处理的图片文件（PNG、JPEG 等常见格式） |
-
-成功响应（200）：返回 PNG 图片二进制流，响应头包含：
-- `Content-Type: image/png`
-- `Content-Disposition: attachment; filename="image.png"`
-
-错误响应示例：
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| 音频输入 | — | `audioFile` / `audioPath` / `audioURL` / `audioBase64`，支持 m4a、mp3、wav、caf 等 |
+| `locale` | String | 如 `en-US`、`zh-CN`，默认 `en-US` |
 
 ```json
 {
-  "error": true,
-  "reason": "未找到前景实例。"
+  "locale": "en-US",
+  "text": "Hello world.",
+  "segments": [{"text": "Hello world.", "start": 0.0, "duration": 1.2}]
 }
 ```
 
-示例（curl）：
+首次使用某种语言时会自动下载系统语音模型。通过 `audioBase64` 或没有文件名的方式提交时，服务按 m4a 处理。
 
-```bash
-curl -X POST http://localhost:8080/image-feature/background-removal \
-  -F "imageFile=@/path/to/your/image.jpg" \
-  --output background_removed.png
+### `GET /speech/supported-locales`
+```json
+{"supported": ["en-US", "zh-CN"], "installed": ["en-US"]}
 ```
 
-## 错误与状态码
+## 翻译（macOS 26+）
 
-- 400 Bad Request：请求参数无效或缺失（如未提供任何图片来源）。
-- 500 Internal Server Error：服务端处理失败（如图像转换失败、未找到前景实例）。
+### `POST /translation/translate`
 
-返回的错误内容通常包含 `reason` 字段说明失败原因。
+请求体为 JSON 或表单。
 
-## 其他说明
+| 参数 | 类型 | 说明 |
+|---|---|---|
+| `text` | String | 待翻译文本 |
+| `texts` | [String] | 批量文本，可与 `text` 同时提供 |
+| `sourceLanguage` | String | 源语言，省略则自动检测 |
+| `targetLanguage` | String | 目标语言，必填，如 `zh-Hans` |
 
-1. 请求体最大默认 20MB，适用于大多数图像处理场景。
-2. 背景移除接口需要 macOS 15.0 及以上环境。
-3. 运行服务后可访问 Swagger UI：`http://localhost:8080/Swagger/index.html`。
-4. 也可访问交互式文档（Stoplight）：`http://localhost:8080/stoplight`，OpenAPI JSON：`http://localhost:8080/Swagger/swagger.json`。
-
-## 运行服务
-
-### 使用 Swift 运行
-
-```bash
-# 克隆项目
-git clone https://github.com/tdawn0-0/vision-api
-cd vision-api
-
-# 解析依赖
-swift package resolve
-
-# 启动服务
-swift run App
+```json
+{"sourceLanguage": "en", "targetLanguage": "zh", "translations": ["你好，世界"]}
 ```
 
-### 使用 Docker 运行
+语言包未下载时返回 409，需要在“系统设置 → 通用 → 语言与地区 → 翻译语言”中下载。
 
-```bash
-# 构建镜像
-docker-compose build
-
-# 启动服务
-docker-compose up app
-
-# 停止服务
-docker-compose down
+### `GET /translation/supported-languages`
+```json
+{"languages": ["en", "ja", "zh"]}
 ```
-
-服务启动后默认监听：`http://localhost:8080`。
-

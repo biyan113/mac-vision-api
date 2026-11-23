@@ -23,7 +23,7 @@ const Layout: React.FC<LayoutProps> = ({ children }) => {
       <Sidebar isOpen={sidebarOpen} onClose={handleCloseSidebar} />
 
       {/* 主内容区域 */}
-      <div className="flex-1 flex flex-col lg:pl-64">
+      <div className="flex-1 min-w-0 flex flex-col">
         {/* 顶部导航 */}
         <Header onMenuToggle={handleToggleSidebar} />
 

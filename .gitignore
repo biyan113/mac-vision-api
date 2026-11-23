@@ -10,3 +10,8 @@ db.sqlite
 .env.*
 ! .env.example
 .vscode
+*.log
+node_modules/
+dist/
+/Public/index.html
+/Public/assets/

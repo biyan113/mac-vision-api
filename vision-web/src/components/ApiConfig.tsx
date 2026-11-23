@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react'
 import { Settings, TestTube, CheckCircle, XCircle, Loader2 } from 'lucide-react'
-import { setApiBaseUrl, getCurrentApiUrl, checkServerHealth } from '../services/api'
+import { setApiBaseUrl, getCurrentApiUrl, checkServerHealth, getApiKey, setApiKey, DEFAULT_API_BASE_URL } from '../services/api'
 import { showToast } from './ui/Toast'
 
 interface ApiConfigProps {
@@ -10,6 +10,7 @@ interface ApiConfigProps {
 const ApiConfig: React.FC<ApiConfigProps> = ({ onConfigChange }) => {
   const [isOpen, setIsOpen] = useState(false)
   const [apiUrl, setApiUrl] = useState('')
+  const [apiKey, setApiKeyValue] = useState('')
   const [isTesting, setIsTesting] = useState(false)
   const [testResult, setTestResult] = useState<{
     isHealthy: boolean
@@ -19,6 +20,7 @@ const ApiConfig: React.FC<ApiConfigProps> = ({ onConfigChange }) => {
 
   useEffect(() => {
     setApiUrl(getCurrentApiUrl())
+    setApiKeyValue(getApiKey())
   }, [])
 
   const handleSave = () => {
@@ -29,16 +31,20 @@ const ApiConfig: React.FC<ApiConfigProps> = ({ onConfigChange }) => {
 
     // 确保URL格式正确
     let formattedUrl = apiUrl.trim()
-    if (!formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
+    // 以 / 开头的相对地址（如 /api）保持不变
+    if (!formattedUrl.startsWith('/') && !formattedUrl.startsWith('http://') && !formattedUrl.startsWith('https://')) {
       formattedUrl = 'http://' + formattedUrl
     }
-    
-    // 移除末尾的斜杠
-    formattedUrl = formattedUrl.replace(/\/$/, '')
 
+    // 移除末尾的斜杠
+    if (formattedUrl.length > 1) {
+      formattedUrl = formattedUrl.replace(/\/$/, '')
+    }
+
+    setApiKey(apiKey.trim())
     setApiBaseUrl(formattedUrl)
     setApiUrl(formattedUrl)
-    showToast('success', 'API地址已保存')
+    showToast('success', 'API配置已保存')
     setIsOpen(false)
     onConfigChange?.()
   }
@@ -80,7 +86,7 @@ const ApiConfig: React.FC<ApiConfigProps> = ({ onConfigChange }) => {
   }
 
   const handleReset = () => {
-    const defaultUrl = process.env.NODE_ENV === 'production' ? '/api' : 'http://localhost:8080'
+    const defaultUrl = DEFAULT_API_BASE_URL
     setApiUrl(defaultUrl)
     setApiBaseUrl(defaultUrl)
     setTestResult(null)
@@ -129,6 +135,24 @@ const ApiConfig: React.FC<ApiConfigProps> = ({ onConfigChange }) => {
                 />
                 <p className="mt-1 text-xs text-gray-500">
                   输入后端服务的完整地址，包括协议和端口号
+                </p>
+              </div>
+
+              {/* API Key 输入 */}
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  API Key（可选）
+                </label>
+                <input
+                  type="password"
+                  value={apiKey}
+                  onChange={(e) => setApiKeyValue(e.target.value)}
+                  placeholder="后端设置了 VISION_API_KEY 时填写"
+                  autoComplete="off"
+                  className="w-full px-3 py-2 border border-gray-300 rounded-md focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-blue-500"
+                />
+                <p className="mt-1 text-xs text-gray-500">
+                  仅保存在当前浏览器中
                 </p>
               </div>
 
