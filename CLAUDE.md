@@ -22,10 +22,10 @@ swift package resolve
 # Run development server (default: localhost:8080)
 swift run App
 
-# Run the AppKit desktop GUI (Sources/VisionApp, calls Vision directly, no server needed)
+# Run the AppKit desktop GUI (calls Vision directly; can also start the API server in-process)
 swift run VisionApp
 
-# Package the GUI as .build/VisionApp.app
+# Package the GUI as .build/VisionApp.app plus a distributable zip
 ./scripts/build-app.sh
 
 # Run with specific environment
@@ -57,21 +57,30 @@ swift test
 
 # Test specific target
 swift test --filter AppTests
+swift test --filter VisionCoreTests
 ```
 
 ## Architecture Overview
 
+### Package Targets
+- **VisionCore** (library, `Sources/VisionCore`): all Vision / PDFKit logic. No Vapor, no AppKit. Functions take `Data`, run synchronously and throw. Its result models (`ClassificationResponse`, `ObjectDetectionResponse`, `BarcodeResponse`, `PDFTextResponse`, ...) are also the HTTP response bodies, so renaming a field changes the API.
+- **VisionServer** (library, `Sources/VisionServer`): `configure`, `routes`, controllers, shared image input parsing (`ImageInput`), plus `EmbeddedServer` and `ServerLogStore` used by the GUI.
+- **App** (executable, `Sources/App`): entry point only; runs the HTTP server from the command line.
+- **VisionApp** (executable, `Sources/VisionApp`): pure-AppKit GUI with programmatic layout (no storyboards, no SwiftUI). UI strings are in code via `L("中文", "English")`, not resource bundles.
+
+New Vision capabilities go into `VisionCore` first; controllers and the GUI only adapt input and output.
+
 ### Route Structure
 - **Root Path**: `/` → Redirects to Swagger UI
 - **Text Detection**: `/text-detection/recognize-text` → OCR functionality
-- **Image Features**: `/image-feature/background-removal` → Background removal (macOS 15.0+)
+- **Image Features**: `/image-feature/background-removal` → Background removal (macOS 14.0+)
 - **Documentation**: `/Swagger/index.html` → Auto-generated API docs
 
 ### Controller Architecture
 The application follows a controller-based architecture:
 
 1. **TextDetectionController**: Handles OCR operations using VNRecognizeTextRequest
-2. **ImageFeatureController**: Handles background removal using VNGenerateForegroundInstanceMaskRequest (macOS 15.0+)
+2. **ImageFeatureController**: Handles background removal using VNGenerateForegroundInstanceMaskRequest (macOS 14.0+)
 3. **OpenAPIController**: Generates Swagger documentation
 
 ### Request Handling Pattern
@@ -87,7 +96,7 @@ All controllers support multiple image input methods:
   - Configurable accuracy with `recognitionLevel` (0=accurate, 1=fast)
 - **Background Removal**: Uses `VNGenerateForegroundInstanceMaskRequest`
   - Returns PNG with transparent background
-  - Requires macOS 15.0+
+  - Requires macOS 14.0+
 
 ### Configuration
 - **Max Request Size**: 20MB (configured in routes.swift)
@@ -111,12 +120,12 @@ All request handlers use `@Sendable` async functions for concurrency safety.
 
 ### Platform Availability
 - Core OCR features: macOS 13.0+
-- Background removal: macOS 15.0+ (feature-gated in routes.swift)
+- Background removal: macOS 14.0+ (feature-gated in routes.swift)
 
 ## Development Guidelines
 
 ### Adding New Vision Features
-1. Create new controller in `Sources/App/Controllers/`
+1. Add the Vision logic to `Sources/VisionCore`, then create a controller in `Sources/VisionServer/Controllers/`
 2. Define request/response models with `@OpenAPIDescriptable`
 3. Register routes in `routes.swift` with version checks if needed
 4. Use consistent error handling patterns from existing controllers

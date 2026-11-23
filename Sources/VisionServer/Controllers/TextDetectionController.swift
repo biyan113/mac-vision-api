@@ -1,7 +1,7 @@
 import SwiftOpenAPI
 // 导入必要的框架
 import Vapor
-import Vision
+import VisionCore
 
 /// 文本检测控制器
 /// 提供图像中文本识别（OCR）相关的API接口
@@ -27,35 +27,7 @@ struct TextDetectionController: RouteCollection {
     /// - Throws: 处理过程中可能发生的错误
     @Sendable func recognizeTextRequest(req: Request) async throws -> recognizeTextResponse {
         // 解码请求数据
-        var imageData: Data
-
-        if let imageFile = try? req.content.get(Data.self, at: "imageFile") {
-            imageData = imageFile
-        } else if let imagePath = try? req.content.get(String.self, at: "imagePath") {
-            // 处理本地文件路径
-            guard let fileData = FileManager.default.contents(atPath: imagePath) else {
-                throw Abort(.badRequest, reason: "无法读取指定路径的图片文件")
-            }
-            imageData = fileData
-        } else if let imageURL = try? req.content.get(String.self, at: "imageURL") {
-            // 处理远程URL
-            let uri = URI(string: imageURL)
-            let response = try await req.client.get(uri)
-            guard let remoteData = response.body else {
-                throw Abort(.badRequest, reason: "无法从URL获取图片数据")
-            }
-            imageData = Data(buffer: remoteData)
-        } else if let base64String = try? req.content.get(String.self, at: "imageBase64") {
-            // 处理 base64 编码的图片数据
-            // 移除可能存在的 base64 头部信息（如 "data:image/jpeg;base64,"）
-            let base64Data = base64String.components(separatedBy: ",").last ?? base64String
-            guard let decodedData = Data(base64Encoded: base64Data) else {
-                throw Abort(.badRequest, reason: "无效的Base64图片数据")
-            }
-            imageData = decodedData
-        } else {
-            throw Abort(.badRequest, reason: "请提供图片文件、本地路径、远程URL或Base64编码数据其中之一")
-        }
+        let imageData = try await ImageInput.decode(from: req)
 
         // 获取可选参数
         var recognitionLanguages = (try? req.content.get(String.self, at: "recognitionLanguages"))?
@@ -73,49 +45,18 @@ struct TextDetectionController: RouteCollection {
 
         let recognitionLevel = try? req.content.get(Int.self, at: "recognitionLevel")
 
-        var textString = ""
-
-        // 创建图像处理处理器
-        let requestHandler = VNImageRequestHandler(data: imageData)
-
-        /// 文本识别完成后的回调处理
-        func recognizeTextHandler(request: VNRequest, error: Error?) {
-            guard
-                let observations =
-                    request.results as? [VNRecognizedTextObservation]
-            else {
-                return
-            }
-            // 提取识别到的文本
-            let recognizedStrings = observations.compactMap { observation in
-                observation.topCandidates(1).first?.string
-            }
-
-            // 将所有识别到的文本用换行符连接
-            textString = recognizedStrings.joined(separator: "\n")
-        }
-
-        // 创建文本识别请求
-        let textRequest = VNRecognizeTextRequest(completionHandler: recognizeTextHandler)
-
-        // 配置识别语言
-        // 注意：recognitionLanguages 支持数组，可以同时指定多种语言进行混合识别
-        // 例如 ["zh-Hans", "en-US"] 可以同时识别中英文
-        if let languages = recognitionLanguages, !languages.isEmpty {
-            textRequest.recognitionLanguages = languages
-        } else {
-            // 自动检测语言模式：Vision 会自动识别文本语言
-            textRequest.automaticallyDetectsLanguage = true
-        }
-
-        // 配置识别精度级别
-        if recognitionLevel == 1 {
-            textRequest.recognitionLevel = .fast
-        }
+        // 语言列表为空时由 Vision 自动检测语言
+        let options = TextRecognitionOptions(
+            languages: (recognitionLanguages ?? []).filter { !$0.isEmpty },
+            fast: recognitionLevel == 1
+        )
 
         // 执行文本识别
+        let textString: String
         do {
-            try requestHandler.perform([textRequest])
+            textString = try VisionEngine.recognizeText(imageData: imageData, options: options)
+                .map { $0.text }
+                .joined(separator: "\n")
         } catch {
             print("无法执行识别请求: \(error).")
             textString = "无法执行识别请求: \(error)."

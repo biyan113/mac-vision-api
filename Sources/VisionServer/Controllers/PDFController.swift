@@ -1,10 +1,8 @@
 // 导入必要的框架
-import CoreGraphics
 import Foundation
-import PDFKit
 import SwiftOpenAPI
-import UniformTypeIdentifiers
 import Vapor
+import VisionCore
 
 /// PDF处理控制器
 /// 提供PDF处理相关的API接口，如渲染为位图、文本抽取等功能
@@ -40,82 +38,20 @@ struct PDFController: RouteCollection {
         let pdfData = try await getPDFData(from: data, req: req)
         req.logger.info("PDF数据获取成功，大小: \(pdfData.count) bytes")
         
-        // 创建PDF文档
-        guard let pdfDocument = PDFDocument(data: pdfData) else {
-            throw Abort(.badRequest, reason: "无效的PDF文件格式")
-        }
-        
-        // 验证页面索引
-        let pageCount = pdfDocument.pageCount
+        // 渲染指定页面（默认第一页、150 DPI）
         let pageIndex = data.pageIndex ?? 0
-        
-        guard pageIndex >= 0 && pageIndex < pageCount else {
-            throw Abort(.badRequest, reason: "页面索引超出范围，PDF共有\(pageCount)页")
+        let pngData: Data
+        do {
+            pngData = try PDFEngine.renderPage(pdfData: pdfData, pageIndex: pageIndex, dpi: data.dpi ?? 150.0)
+        } catch {
+            throw httpError(from: error)
         }
-        
-        // 获取指定页面
-        guard let page = pdfDocument.page(at: pageIndex) else {
-            throw Abort(.badRequest, reason: "无法获取第\(pageIndex + 1)页")
-        }
-        
-        // 设置渲染参数
-        let dpi = data.dpi ?? 150.0
-        let scale = dpi / 72.0 // PDF默认72 DPI
-        
-        // 获取页面边界
-        let mediaBox = page.bounds(for: .mediaBox)
-        let renderSize = CGSize(
-            width: mediaBox.width * scale,
-            height: mediaBox.height * scale
-        )
-        
-        // 创建位图上下文
-        let colorSpace = CGColorSpaceCreateDeviceRGB()
-        let bitmapInfo = CGImageAlphaInfo.premultipliedLast.rawValue
-        
-        guard let context = CGContext(
-            data: nil,
-            width: Int(renderSize.width),
-            height: Int(renderSize.height),
-            bitsPerComponent: 8,
-            bytesPerRow: 0,
-            space: colorSpace,
-            bitmapInfo: bitmapInfo
-        ) else {
-            throw Abort(.internalServerError, reason: "无法创建渲染上下文")
-        }
-        
-        // 设置背景色为白色
-        context.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 1.0))
-        context.fill(CGRect(origin: .zero, size: renderSize))
-        
-        // 缩放上下文以匹配DPI
-        context.scaleBy(x: scale, y: scale)
-        
-        // 渲染PDF页面
-        page.draw(with: .mediaBox, to: context)
-        
-        // 创建CGImage
-        guard let cgImage = context.makeImage() else {
-            throw Abort(.internalServerError, reason: "渲染失败")
-        }
-        
-        // 转换为PNG数据
-        let mutableData = NSMutableData()
-        guard let destination = CGImageDestinationCreateWithData(mutableData, UTType.png.identifier as CFString, 1, nil) else {
-            throw Abort(.internalServerError, reason: "无法创建图像目标")
-        }
-        
-        CGImageDestinationAddImage(destination, cgImage, nil)
-        guard CGImageDestinationFinalize(destination) else {
-            throw Abort(.internalServerError, reason: "图像编码失败")
-        }
-        
+
         // 返回PNG响应
         let response = Response(status: .ok)
         response.headers.contentType = .png
         response.headers.add(name: .contentDisposition, value: "attachment; filename=\"page_\(pageIndex + 1).png\"")
-        response.body = .init(data: mutableData as Data)
+        response.body = .init(data: pngData)
         
         return response
     }
@@ -131,48 +67,17 @@ struct PDFController: RouteCollection {
         // 获取PDF数据
         let pdfData = try await getPDFData(from: data, req: req)
         
-        // 创建PDF文档
-        guard let pdfDocument = PDFDocument(data: pdfData) else {
-            throw Abort(.badRequest, reason: "无效的PDF文件格式")
+        // 抽取内嵌文本
+        do {
+            return try PDFEngine.extractText(
+                pdfData: pdfData,
+                startPage: data.startPage,
+                endPage: data.endPage,
+                mergePages: data.mergePages == true
+            )
+        } catch {
+            throw httpError(from: error)
         }
-        
-        let pageCount = pdfDocument.pageCount
-        var extractedPages: [PDFPageText] = []
-        
-        // 确定要处理的页面范围
-        let startPage = data.startPage ?? 0
-        let endPage = data.endPage ?? (pageCount - 1)
-        
-        guard startPage >= 0 && startPage < pageCount else {
-            throw Abort(.badRequest, reason: "起始页面索引超出范围")
-        }
-        
-        guard endPage >= startPage && endPage < pageCount else {
-            throw Abort(.badRequest, reason: "结束页面索引无效")
-        }
-        
-        // 逐页抽取文本
-        for pageIndex in startPage...endPage {
-            guard let page = pdfDocument.page(at: pageIndex) else {
-                continue
-            }
-            
-            let pageText = page.string ?? ""
-            extractedPages.append(PDFPageText(
-                pageNumber: pageIndex + 1,
-                text: pageText
-            ))
-        }
-        
-        // 如果需要合并所有页面文本
-        let allText = data.mergePages == true ? 
-            extractedPages.map { $0.text }.joined(separator: "\n\n") : nil
-        
-        return PDFTextResponse(
-            totalPages: pageCount,
-            extractedPages: extractedPages,
-            allText: allText
-        )
     }
     
     /// 从请求中获取PDF数据
@@ -260,15 +165,4 @@ struct PDFTextRequest: Content, PDFDataSource {
     let mergePages: Bool? // 是否合并所有页面文本
 }
 
-/// PDF页面文本
-struct PDFPageText: Content {
-    let pageNumber: Int
-    let text: String
-}
-
-/// PDF文本抽取响应
-struct PDFTextResponse: Content {
-    let totalPages: Int
-    let extractedPages: [PDFPageText]
-    let allText: String?
-}
+// 响应模型 PDFPageText、PDFTextResponse 定义在 VisionCore 中

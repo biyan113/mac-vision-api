@@ -115,7 +115,7 @@ curl -X POST http://localhost:8080/image-feature/background-removal \
 ## 其他说明
 
 1. 请求体最大默认 20MB，适用于大多数图像处理场景。
-2. 背景移除接口需要 macOS 15.0 及以上环境。
+2. 背景移除接口需要 macOS 14.0 及以上环境。
 3. 运行服务后可访问 Swagger UI：`http://localhost:8080/Swagger/index.html`。
 4. 也可访问交互式文档（Stoplight）：`http://localhost:8080/stoplight`，OpenAPI JSON：`http://localhost:8080/Swagger/swagger.json`。
 

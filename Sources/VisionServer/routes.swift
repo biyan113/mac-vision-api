@@ -28,8 +28,8 @@ func routes(_ app: Application) throws {
     try app.register(collection: PDFController())
     
     // 注册图像特征控制器
-    // 仅在macOS 15.0及以上版本可用
-    if #available(macOS 15.0, *) {
+    // 仅在macOS 14.0及以上版本可用
+    if #available(macOS 14.0, *) {
         try app.register(collection: ImageFeatureController())
     } else {
         // 在较早版本上不提供此功能

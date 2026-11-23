@@ -1,4 +1,4 @@
-@testable import App
+@testable import VisionServer
 import XCTVapor
 import Testing
 
@@ -15,5 +15,23 @@ struct AppTests {
             throw error
         }
         try await app.asyncShutdown()
+    }
+
+    @Test("健康检查接口返回 200")
+    func health() async throws {
+        try await withApp { app in
+            try await app.test(.GET, "health", afterResponse: { res async in
+                #expect(res.status == .ok)
+            })
+        }
+    }
+
+    @Test("缺少图片参数时返回 400")
+    func classifyWithoutImage() async throws {
+        try await withApp { app in
+            try await app.test(.POST, "vision/classify", afterResponse: { res async in
+                #expect(res.status == .badRequest)
+            })
+        }
     }
 }

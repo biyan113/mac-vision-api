@@ -1,13 +1,29 @@
 import AppKit
 import UniformTypeIdentifiers
 
-/// 按比例显示图片的视图，可叠加检测框，并可选支持拖入图片文件
+/// 按比例显示图片的视图，可叠加检测框，并可选支持拖入图片或 PDF 文件
 final class ImageCanvasView: NSView {
     var image: NSImage? {
         didSet { needsDisplay = true }
     }
 
-    var boxes: [VisionBox] = [] {
+    var boxes: [OverlayBox] = [] {
+        didSet {
+            highlightedIndex = nil
+            needsDisplay = true
+        }
+    }
+
+    /// 当前高亮的检测框下标
+    var highlightedIndex: Int? {
+        didSet { needsDisplay = true }
+    }
+
+    /// 点击检测框（或空白处，此时为 nil）时调用
+    var onSelectBox: ((Int?) -> Void)?
+
+    /// 是否在图片下方绘制棋盘格，用来表现透明区域
+    var showsCheckerboard = false {
         didSet { needsDisplay = true }
     }
 
@@ -15,10 +31,10 @@ final class ImageCanvasView: NSView {
         didSet { needsDisplay = true }
     }
 
-    /// 设置后视图接受拖入的图片文件
-    var onDropImage: ((URL) -> Void)? {
+    /// 设置后视图接受拖入的图片或 PDF 文件
+    var onDropFile: ((URL) -> Void)? {
         didSet {
-            if onDropImage != nil {
+            if onDropFile != nil {
                 registerForDraggedTypes([.fileURL])
             } else {
                 unregisterDraggedTypes()
@@ -45,25 +61,58 @@ final class ImageCanvasView: NSView {
             return
         }
 
+        if showsCheckerboard {
+            drawCheckerboard(in: imageRect)
+        }
         image.draw(in: imageRect)
 
-        for box in boxes {
-            // Vision 的归一化坐标与 AppKit 一样以左下角为原点
-            let rect = NSRect(
-                x: imageRect.minX + box.rect.minX * imageRect.width,
-                y: imageRect.minY + box.rect.minY * imageRect.height,
-                width: box.rect.width * imageRect.width,
-                height: box.rect.height * imageRect.height
-            )
+        for (index, box) in boxes.enumerated() {
+            let rect = viewRect(for: box, in: imageRect)
+            let isHighlighted = index == highlightedIndex
             let path = NSBezierPath(rect: rect)
-            path.lineWidth = 1.5
-            NSColor.systemRed.setStroke()
+            if isHighlighted {
+                NSColor.controlAccentColor.withAlphaComponent(0.3).setFill()
+                path.fill()
+            }
+            path.lineWidth = isHighlighted ? 2.5 : 1.5
+            (isHighlighted ? NSColor.controlAccentColor : NSColor.systemRed).setStroke()
             path.stroke()
 
             if !box.label.isEmpty {
                 drawLabel(box.label, above: rect)
             }
         }
+    }
+
+    /// 把 Vision 的归一化坐标换算到视图坐标（两者都以左下角为原点）
+    private func viewRect(for box: OverlayBox, in imageRect: NSRect) -> NSRect {
+        NSRect(
+            x: imageRect.minX + box.rect.minX * imageRect.width,
+            y: imageRect.minY + box.rect.minY * imageRect.height,
+            width: box.rect.width * imageRect.width,
+            height: box.rect.height * imageRect.height
+        )
+    }
+
+    private func drawCheckerboard(in rect: NSRect) {
+        NSGraphicsContext.saveGraphicsState()
+        NSBezierPath(rect: rect).addClip()
+        NSColor.white.setFill()
+        rect.fill()
+        NSColor(calibratedWhite: 0.82, alpha: 1).setFill()
+        let side: CGFloat = 10
+        var row = 0
+        var y = rect.minY
+        while y < rect.maxY {
+            var x = rect.minX + (row % 2 == 0 ? 0 : side)
+            while x < rect.maxX {
+                NSRect(x: x, y: y, width: side, height: side).fill()
+                x += side * 2
+            }
+            y += side
+            row += 1
+        }
+        NSGraphicsContext.restoreGraphicsState()
     }
 
     private func fittedRect(for size: NSSize) -> NSRect? {
@@ -115,19 +164,46 @@ final class ImageCanvasView: NSView {
         text.draw(at: NSPoint(x: labelRect.minX + 4, y: labelRect.minY + 1))
     }
 
+    // MARK: - 点击检测框
+
+    override func mouseDown(with event: NSEvent) {
+        guard let onSelectBox = onSelectBox,
+              let image = image,
+              let imageRect = fittedRect(for: image.size)
+        else {
+            super.mouseDown(with: event)
+            return
+        }
+
+        let point = convert(event.locationInWindow, from: nil)
+        // 多个框重叠时选面积最小的那个
+        var selected: Int?
+        var selectedArea = CGFloat.greatestFiniteMagnitude
+        for (index, box) in boxes.enumerated() {
+            let rect = viewRect(for: box, in: imageRect).insetBy(dx: -2, dy: -2)
+            let area = rect.width * rect.height
+            if rect.contains(point), area < selectedArea {
+                selected = index
+                selectedArea = area
+            }
+        }
+        highlightedIndex = selected
+        onSelectBox(selected)
+    }
+
     // MARK: - 拖放
 
-    private func droppedImageURL(from info: NSDraggingInfo) -> URL? {
+    private func droppedFileURL(from info: NSDraggingInfo) -> URL? {
         let options: [NSPasteboard.ReadingOptionKey: Any] = [
             .urlReadingFileURLsOnly: true,
-            .urlReadingContentsConformToTypes: [UTType.image.identifier],
+            .urlReadingContentsConformToTypes: [UTType.image.identifier, UTType.pdf.identifier],
         ]
         let urls = info.draggingPasteboard.readObjects(forClasses: [NSURL.self], options: options) as? [URL]
         return urls?.first
     }
 
     override func draggingEntered(_ sender: NSDraggingInfo) -> NSDragOperation {
-        guard onDropImage != nil, droppedImageURL(from: sender) != nil else { return [] }
+        guard onDropFile != nil, droppedFileURL(from: sender) != nil else { return [] }
         isDropTarget = true
         return .copy
     }
@@ -142,8 +218,8 @@ final class ImageCanvasView: NSView {
 
     override func performDragOperation(_ sender: NSDraggingInfo) -> Bool {
         isDropTarget = false
-        guard let url = droppedImageURL(from: sender), let onDropImage = onDropImage else { return false }
-        onDropImage(url)
+        guard let url = droppedFileURL(from: sender), let onDropFile = onDropFile else { return false }
+        onDropFile(url)
         return true
     }
 }

@@ -1,28 +1,27 @@
 # AppKit 图形界面规划
 
-本文档只做规划，不包含代码改动。对应分支：`claude/elegant-meitner-2rgwzo`。
+本文档记录 AppKit 图形界面的规划与实现状态。对应分支：`claude/elegant-meitner-2rgwzo`。
 
 ## 1. 现状
 
-分支上已有一版 AppKit 图形界面的初稿（`Sources/VisionApp`，可执行目标 `VisionApp`）：
+规划中的六个阶段都已经写出代码并提交，但**全部是在没有 Swift 和 macOS 的 Linux 环境里盲写的，没有在本地编译或运行过**。在 Mac 上拉取后，第一件事是执行 `swift build`、`swift test` 和 `swift run VisionApp`。
 
-| 文件 | 作用 |
-| --- | --- |
-| `AppDelegate.swift` | 入口、主窗口、主菜单 |
-| `MainViewController.swift` | 主界面：功能切换、原图与结果双栏、底部操作栏 |
-| `ImageCanvasView.swift` | 按比例显示图片、叠加检测框、接收拖放 |
-| `VisionService.swift` | 直接调用 Vision 的五个功能 |
-| `scripts/build-app.sh` | 打包为 `.build/VisionApp.app` |
+| 阶段 | 内容 | 状态 |
+| --- | --- | --- |
+| 一 | 编译验证与修正 | 待在 Mac 上执行 |
+| 二 | 抽取共享核心库 `VisionCore`，服务端与界面共用；背景移除统一按 macOS 14 判断 | 已写，未验证 |
+| 三 | PDF 翻页、内嵌文本提取、逐页 OCR；批量处理；文本行与检测框联动；JSON 导出 | 已写，未验证 |
+| 四 | 内嵌 API 服务（`EmbeddedServer`）、服务面板与日志、菜单栏图标 | 已写，未验证 |
+| 五 | 偏好设置、中英文界面、截屏识别 | 已写，未验证 |
+| 六 | 打包脚本（签名、公证、zip）、GitHub Actions | 已写，未验证 |
 
-已覆盖的功能：文字识别、背景移除、图像分类、物体检测、条码识别；图片可通过打开、拖放、粘贴载入；结果可复制、保存。
+与原规划的出入：
 
-已知问题：
-
-1. **初稿从未编译运行过。** 代码是在没有 Swift 和 macOS 的 Linux 环境里写的，第一步必须在 Mac 上验证。
-2. **识别逻辑重复。** `VisionService.swift` 与 `Sources/App/Controllers` 里各有一份 Vision 调用，改一处容易漏另一处。
-3. **版本判断不一致。** 界面按 macOS 14 判断背景移除是否可用，服务端 `routes.swift` 按 macOS 15 判断。
-4. **功能未对齐。** 服务端有 PDF 渲染和文本提取（`PDFController`），界面没有。
-5. **没有测试。** `VisionApp` 目标没有任何测试，`AppTests` 里也只有脚手架。
+- 多语言没有使用 `.lproj` 资源包，而是在代码里用 `L("中文", "English")` 成对书写。原因是 SwiftPM 的资源包在手工拼出的 `.app` 里定位不稳定，写在代码里可以让 `swift run` 与打包后的行为一致。
+- 截屏识别调用系统自带的 `screencapture -i`，没有自己实现框选界面。
+- 应用图标没有提供；打包脚本在 `Assets/AppIcon.png` 存在时会自动生成 `.icns`。
+- “在浏览器中打开”打开的是服务根地址。`OpenAPIController` 目前没有在 `routes.swift` 中注册，所以 Swagger 页面拿不到 `swagger.json`；这是原有行为，本次没有改动。
+- `VisionCoreTests` 的测试素材（文字图片、二维码、PDF）都在运行时生成，没有往仓库里放样例图片。
 
 ## 2. 目标与非目标
 
@@ -42,9 +41,10 @@
 
 ```
 Package.swift
-├── VisionCore   （库）  纯 Vision / PDFKit 逻辑，不依赖 Vapor 和 AppKit
-├── App          （可执行）Vapor 路由与控制器，只做参数解析和响应封装，调用 VisionCore
-├── VisionApp    （可执行）AppKit 界面，调用 VisionCore
+├── VisionCore     （库）  纯 Vision / PDFKit 逻辑，不依赖 Vapor 和 AppKit
+├── VisionServer   （库）  Vapor 路由与控制器、可内嵌的服务器，调用 VisionCore
+├── App            （可执行）命令行 HTTP 服务入口
+├── VisionApp      （可执行）AppKit 界面，调用 VisionCore 和 VisionServer
 └── VisionCoreTests / AppTests
 ```
 
@@ -52,7 +52,7 @@ Package.swift
 
 - `VisionCore` 的函数输入为 `Data`，输出为普通的 `Sendable` 结构体，同步执行并抛出错误；线程调度由调用方负责。
 - 控制器里的图片输入解析（文件、路径、URL、Base64）目前在 `TextDetectionController` 和 `VisionAnalysisController` 中各写了一遍，一并收敛为一个共用函数，留在 `App` 目标内。
-- 内嵌服务阶段（阶段四）需要把 `configure` 和 `routes` 从可执行目标移入库目标 `VisionServer`，`App` 只保留入口。
+- `configure`、`routes` 和控制器位于库目标 `VisionServer`，`App` 只保留入口，这样界面可以在进程内启动同一套服务。
 
 ## 4. 分阶段计划
 

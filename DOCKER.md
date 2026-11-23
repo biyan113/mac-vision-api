@@ -161,7 +161,7 @@ docker run --rm -p 3000:80 --name vision-web-standalone vision-web
    # 检查 macOS 版本
    sw_vers
    
-   # 背景移除功能需要 macOS 15.0+
+   # 背景移除功能需要 macOS 14.0+
    ```
 
 3. **镜像构建失败**

@@ -50,18 +50,29 @@ For more feature visit: [Vision Framwork](https://developer.apple.com/documentat
 
 ### Desktop App (AppKit)
 
-A native AppKit GUI is also included. It calls the Vision framework directly, so the HTTP server does not need to be running.
+A native AppKit app is included. It calls the Vision framework directly, so the HTTP server does not need to be running, and it can also start and stop the API server from its own window or menu bar icon.
 
 ```bash
 # Run directly
 swift run VisionApp
 
-# Or build a double-clickable bundle at .build/VisionApp.app
+# Or build a double-clickable bundle at .build/VisionApp.app (plus a zip for distribution)
 ./scripts/build-app.sh
 open .build/VisionApp.app
 ```
 
-Open, drag in, or paste (⌘V) an image, then pick a feature: text recognition, background removal (macOS 14+), image classification, object detection, or barcode scanning. Results can be copied or saved.
+What it does:
+
+- Text recognition, background removal (macOS 14+), image classification, object detection, barcode scanning
+- Open, drag in or paste (⌘V) images and PDFs; page through a PDF, extract its embedded text, or OCR every page
+- Capture a screen region and recognize its text (⇧⌘2)
+- Click a detected box to select the matching result line, and the other way round
+- Copy or save results, export JSON in the same shape as the API responses
+- Batch-process many files into an output folder (⌘B)
+- Start and stop the API server in-process, with a log view (⇧⌘L)
+- Chinese and English interface
+
+`scripts/build-app.sh` reads `CODESIGN_IDENTITY` and `NOTARY_PROFILE` for Developer ID signing and notarization; without them the app is ad-hoc signed for local use only.
 
 ### Using the API
 

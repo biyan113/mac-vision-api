@@ -1,5 +1,6 @@
 // 导入必要的框架
 import Vapor
+import VisionServer
 import Logging
 import NIOCore
 import NIOPosix
