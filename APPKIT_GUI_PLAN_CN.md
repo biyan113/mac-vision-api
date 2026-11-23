@@ -13,7 +13,7 @@
 | 三 | PDF 翻页、内嵌文本提取、逐页 OCR；批量处理；文本行与检测框联动；JSON 导出 | 已写，未验证 |
 | 四 | 内嵌 API 服务（`EmbeddedServer`）、服务面板与日志、菜单栏图标 | 已写，未验证 |
 | 五 | 偏好设置、中英文界面、截屏识别 | 已写，未验证 |
-| 六 | 打包脚本（签名、公证、zip）、GitHub Actions | 已写，未验证 |
+| 六 | 打包脚本（签名、公证、zip），在本地运行；GitHub Actions 只做构建和测试，不打包 | 已写，未验证 |
 
 与原规划的出入：
 
@@ -99,7 +99,7 @@ Package.swift
 
 - 完善 `.app` 包（图标、版本号、文档类型关联，使图片可以“打开方式”选中本应用）。
 - Developer ID 签名与公证，产出 DMG 或 zip。
-- GitHub Actions 使用 macOS 运行器，对每次提交执行 `swift build` 与 `swift test`，打标签时产出安装包。
+- GitHub Actions 使用 macOS 运行器，对每次提交执行 `swift build` 与 `swift test`。打包不走 CI，在本地用 `scripts/build-app.sh` 完成。
 
 ## 5. 需要确认的决策
 

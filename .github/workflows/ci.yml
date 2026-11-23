@@ -3,7 +3,6 @@ name: CI
 on:
   push:
     branches: [master]
-    tags: ["v*"]
   pull_request:
 
 permissions:
@@ -23,15 +22,3 @@ jobs:
 
       - name: Test
         run: swift test
-
-      - name: Package app
-        run: ./scripts/build-app.sh
-        env:
-          APP_VERSION: ${{ startsWith(github.ref, 'refs/tags/v') && github.ref_name || '0.0.0-dev' }}
-
-      - name: Upload app
-        uses: actions/upload-artifact@v4
-        with:
-          name: VisionApp
-          path: .build/VisionApp-*.zip
-          if-no-files-found: error
