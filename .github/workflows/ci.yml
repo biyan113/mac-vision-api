@@ -23,9 +23,18 @@ jobs:
           key: spm-${{ runner.os }}-${{ hashFiles('Package.resolved') }}
           restore-keys: spm-${{ runner.os }}-
       - name: Build
-        run: swift build
+        run: |
+          set -o pipefail
+          swift build 2>&1 | tee build.log
       - name: Test
-        run: swift test
+        run: |
+          set -o pipefail
+          swift test 2>&1 | tee test.log
+      - name: Error summary
+        if: failure()
+        run: |
+          echo "==== unique errors ===="
+          cat build.log test.log 2>/dev/null | grep -E "error:|failed|Fatal error" | sed 's/^.*mac-vision-api\/mac-vision-api\///' | sort -u | head -80
 
   web:
     name: Web (build)

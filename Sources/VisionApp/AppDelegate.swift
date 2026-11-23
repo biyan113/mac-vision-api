@@ -3,6 +3,7 @@ import VisionCore
 
 /// Vision 桌面应用（AppKit）入口
 @main
+@MainActor
 final class AppDelegate: NSObject, NSApplicationDelegate {
     private var mainWindowController: MainWindowController?
     private var preferencesWindow: NSWindow?
