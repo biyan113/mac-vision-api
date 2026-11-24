@@ -57,7 +57,7 @@ PDF 接口使用 `pdfFile` / `pdfPath` / `pdfURL` / `pdfBase64`，音频接口�
 | 参数 | 类型 | 说明 |
 |---|---|---|
 | 图片输入 | — | 见通用约定 |
-| `recognitionLanguages` | String | 逗号分隔的语言代码，如 `zh-Hans,en-US`。省略则自动检测。只填一个中文代码时会自动加上 `en-US` |
+| `recognitionLanguages` | String | 逗号分隔的语言代码，如 `zh-Hans,en-US`。省略则自动检测。只填一个中文代码时会自动加上 `en-US`。常见简写会被换成完整标识，如 `zh` → `zh-Hans`、`en` → `en-US` |
 | `recognitionLevel` | Int | `0` 精确（默认），`1` 快速 |
 | `includeLines` | Bool | 为 `true` 时返回 `lines` |
 

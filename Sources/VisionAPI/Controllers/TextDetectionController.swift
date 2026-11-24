@@ -30,6 +30,7 @@ struct TextDetectionController: RouteCollection {
             .components(separatedBy: ",")
             .map { $0.trimmingCharacters(in: .whitespacesAndNewlines) }
             .filter { !$0.isEmpty }
+            .map(Self.normalizeLanguage)
 
         // 只指定中文时自动补上英文，便于识别中英文混排
         if let list = languages, list.count == 1, list[0].hasPrefix("zh") {
@@ -66,6 +67,17 @@ struct TextDetectionController: RouteCollection {
                 lines: includeLines ? lines : nil
             )
         }
+    }
+
+    /// 把常见的简写语言代码换成 Vision 使用的标识，例如 zh → zh-Hans、en → en-US
+    static func normalizeLanguage(_ code: String) -> String {
+        let aliases = [
+            "zh": "zh-Hans", "zh-cn": "zh-Hans", "zh-tw": "zh-Hant", "zh-hk": "zh-Hant",
+            "en": "en-US", "ja": "ja-JP", "ko": "ko-KR",
+            "fr": "fr-FR", "de": "de-DE", "es": "es-ES", "it": "it-IT", "pt": "pt-BR",
+            "ru": "ru-RU", "uk": "uk-UA", "th": "th-TH", "vi": "vi-VN",
+        ]
+        return aliases[code.lowercased()] ?? code
     }
 
     @Sendable func supportedLanguagesRequest(req: Request) async throws -> SupportedLanguagesResponse {

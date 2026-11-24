@@ -72,12 +72,21 @@ export interface OCRRequest {
   imagePath?: string
   imageURL?: string
   imageBase64?: string
-  recognitionLanguages?: string // 逗号分隔的语言代码，如 "zh,en"
+  recognitionLanguages?: string // 逗号分隔的语言代码，如 "zh-Hans,en-US"
   recognitionLevel?: number // 0=精确模式，1=快速模式
+  includeLines?: boolean // 是否返回每行的位置与置信度
+}
+
+export interface OCRLine {
+  text: string
+  confidence: number
+  // 归一化坐标，原点在左下角
+  boundingBox: { x: number; y: number; width: number; height: number }
 }
 
 export interface OCRResponse {
   text: string
+  lines?: OCRLine[]
 }
 
 export const recognizeText = async (data: OCRRequest): Promise<OCRResponse> => {
@@ -100,6 +109,9 @@ export const recognizeText = async (data: OCRRequest): Promise<OCRResponse> => {
   }
   if (data.recognitionLevel !== undefined) {
     formData.append('recognitionLevel', data.recognitionLevel.toString())
+  }
+  if (data.includeLines) {
+    formData.append('includeLines', 'true')
   }
 
   const response: AxiosResponse<OCRResponse> = await api.post(
