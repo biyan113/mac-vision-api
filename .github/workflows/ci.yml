@@ -71,3 +71,28 @@ jobs:
           echo
           curl -fsS -o /dev/null http://127.0.0.1:8099/
           curl -fsS -o /dev/null http://127.0.0.1:8099/Swagger/index.html
+
+  ios:
+    name: iOS app (build)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Test core logic
+        run: swift test --package-path ios/LensCore
+      - name: Generate Xcode project
+        working-directory: ios
+        run: |
+          brew install xcodegen
+          xcodegen generate
+      - name: Build for iOS Simulator
+        working-directory: ios
+        run: |
+          set -o pipefail
+          xcodebuild build \
+            -project LensTranslate.xcodeproj \
+            -scheme LensTranslate \
+            -destination 'generic/platform=iOS Simulator' \
+            -configuration Debug \
+            CODE_SIGNING_ALLOWED=NO \
+            | grep -E "error|warning: unre|BUILD|\*\*" || true
+          test "${PIPESTATUS[0]}" -eq 0
