@@ -1,7 +1,7 @@
 import Vapor
 
 /// 当前版本号
-public let version = "1.0.0"
+public let version = "1.1.0"
 
 /// 配置应用程序：中间件、请求体限制与全部路由。
 ///

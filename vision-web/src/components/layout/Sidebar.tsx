@@ -117,7 +117,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose }) => {
                   Vision API Web Interface
                 </p>
                 <p className="text-xs text-notion-text-light">
-                  v1.0.0
+                  v1.1.0
                 </p>
               </div>
             </div>
