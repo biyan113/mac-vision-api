@@ -87,12 +87,27 @@ jobs:
       - name: Build for iOS Simulator
         working-directory: ios
         run: |
-          set -o pipefail
+          set -euo pipefail
+          # 不用管道过滤输出，避免掩盖 xcodebuild 的退出码
           xcodebuild build \
             -project LensTranslate.xcodeproj \
             -scheme LensTranslate \
             -destination 'generic/platform=iOS Simulator' \
             -configuration Debug \
-            CODE_SIGNING_ALLOWED=NO \
-            | grep -E "error|warning: unre|BUILD|\*\*" || true
-          test "${PIPESTATUS[0]}" -eq 0
+            -derivedDataPath build \
+            -quiet \
+            CODE_SIGNING_ALLOWED=NO
+      - name: Verify the app bundle was produced
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          APP=build/Build/Products/Debug-iphonesimulator/LensTranslate.app
+          test -d "$APP"
+          test -f "$APP/LensTranslate"
+          test -f "$APP/Info.plist"
+          ls -la "$APP" | head -20
+          /usr/libexec/PlistBuddy -c "Print :CFBundleDisplayName" "$APP/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :NSCameraUsageDescription" "$APP/Info.plist"
+          # 确认应用的代码确实被编译进了二进制
+          nm -gU "$APP/LensTranslate" 2>/dev/null | head -5 || true
+          find build/Build/Intermediates.noindex -name "RootView.o" | head -1 | grep -q RootView.o
