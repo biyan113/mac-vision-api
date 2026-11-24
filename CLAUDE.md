@@ -34,6 +34,21 @@ docker compose up --build        # web UI image only (nginx, proxies /api to the
 - `Public/Swagger/` — Swagger UI static files; reads `/Swagger/swagger.json`.
 - `.github/workflows/` — `ci.yml` (macOS build/test, web build), `release.yml` (tagged release: macOS tarball + web image to GHCR).
 
+## iOS app (`ios/`)
+
+A companion iPhone app ("译镜", LensTranslate). It does not call this service; it uses the same system frameworks directly on iOS.
+
+- `ios/LensCore/` — UI-independent logic as a Swift package (coordinate mapping, lemmatizer, vocab SQLite store, wordbook). Has unit tests that run on macOS: `swift test --package-path ios/LensCore`. Put anything testable here.
+- `ios/LensTranslate/` — SwiftUI app (iOS 18+, Swift 5 language mode). `App/` state and languages, `Camera/`, `Services/` (Vision OCR, Translation bridge, speech), `Views/`.
+- `ios/project.yml` — XcodeGen spec. The `.xcodeproj` and `Info.plist` are generated and git-ignored: `cd ios && xcodegen generate`.
+- Translation goes through `.translationTask` in `RootView`; `TranslationBridge` feeds requests into that session via an `AsyncStream`. Do not create `TranslationSession` directly.
+- The system Translation framework does not support Malay; `LanguageOption.all` lists what was measured on macOS 26.
+- Nothing under `ios/` can be built on Linux. CI (`ios` job) is the only compile check: it runs the LensCore tests, builds for the simulator, verifies the app bundle, launches it in a simulator and uploads a screenshot. Camera, microphone and translation behaviour cannot be verified in CI.
+
+## Tools
+
+- `tools/vocab/build_vocab.py` — merges the English Vocabulary Vault spreadsheets into the SQLite database the iOS app imports. The data is CC BY-NC-SA 4.0; never commit the generated database.
+
 ## Routes
 
 | Path | Controller | Min macOS |

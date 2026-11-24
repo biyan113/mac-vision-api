@@ -51,7 +51,7 @@ jobs:
           fi
           SOURCE_VERSION=$(sed -n 's/^public let version = "\(.*\)"$/\1/p' Sources/VisionAPI/configure.swift)
           if [ "$SOURCE_VERSION" != "$VERSION" ]; then
-            echo "::error::要发布的版本 $VERSION 与代码中的 version（$SOURCE_VERSION）不一致，请先更新 Sources/VisionAPI/configure.swift"
+            echo "::error::要发布的版本 $VERSION 与代码中的 version（${SOURCE_VERSION}）不一致，请先更新 Sources/VisionAPI/configure.swift"
             exit 1
           fi
           echo "version=$VERSION" >> "$GITHUB_OUTPUT"
