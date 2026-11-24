@@ -251,6 +251,108 @@ final class RecognitionTests: XCTestCase {
         }
     }
 
+    // MARK: - 依赖模型的能力
+
+    /// 白底上的一个实心圆，作为背景移除的主体
+    private func subjectImage() throws -> String {
+        let context = try makeCanvas(width: 800, height: 600)
+        context.setFillColor(CGColor(red: 0.95, green: 0.55, blue: 0.1, alpha: 1))
+        context.fillEllipse(in: CGRect(x: 250, y: 150, width: 300, height: 300))
+        return try png(context)
+    }
+
+    func testBackgroundRemovalReturnsPNGOrReportsNoSubject() async throws {
+        guard Capabilities.current.backgroundRemoval else { throw XCTSkip("需要 macOS 14") }
+        let image = try subjectImage()
+        try await withApp { app in
+            try await app.test(.POST, "image-feature/background-removal", beforeRequest: { req in
+                try req.content.encode(ImageBody(imageBase64: image))
+            }, afterResponse: { res async in
+                // 合成图片是否被判定为有主体取决于模型，两种结果都合法；但不应出现 5xx
+                if res.status == .ok {
+                    XCTAssertEqual(res.headers.contentType, .png)
+                    let bytes = [UInt8](res.body.readableBytesView.prefix(8))
+                    XCTAssertEqual(bytes, [0x89, 0x50, 0x4E, 0x47, 0x0D, 0x0A, 0x1A, 0x0A])
+                    print("background-removal: 200，返回 PNG \(res.body.readableBytes) 字节")
+                } else {
+                    XCTAssertEqual(res.status, .unprocessableEntity, res.body.string)
+                    print("background-removal: \(res.status.code) \(res.body.string)")
+                }
+            })
+        }
+    }
+
+    func testAestheticsReturnsScoreInRange() async throws {
+        guard Capabilities.current.aesthetics else { throw XCTSkip("需要 macOS 15") }
+        let image = try subjectImage()
+        try await withApp { app in
+            try await app.test(.POST, "vision/aesthetics", beforeRequest: { req in
+                try req.content.encode(ImageBody(imageBase64: image))
+            }, afterResponse: { res async throws in
+                XCTAssertEqual(res.status, .ok, res.body.string)
+                let body = try res.content.decode(AestheticsResponse.self)
+                XCTAssertTrue((-1.0 ... 1.0).contains(body.overallScore), "\(body.overallScore)")
+            })
+        }
+    }
+
+    #if compiler(>=6.2)
+    func testRecognizeDocumentReadsText() async throws {
+        guard #available(macOS 26.0, *), Capabilities.current.documentRecognition else {
+            throw XCTSkip("需要 macOS 26")
+        }
+        let image = try textImage("HELLO VISION 2026")
+        try await withApp { app in
+            try await app.test(.POST, "text-detection/recognize-document", beforeRequest: { req in
+                try req.content.encode(ImageBody(imageBase64: image))
+            }, afterResponse: { res async throws in
+                XCTAssertEqual(res.status, .ok, res.body.string)
+                let body = try res.content.decode(DocumentResponse.self)
+                XCTAssertTrue(body.text.uppercased().contains("HELLO"), body.text)
+                XCTAssertFalse(body.paragraphs.isEmpty)
+            })
+        }
+    }
+
+    func testLensSmudgeReturnsConfidenceInRange() async throws {
+        guard #available(macOS 26.0, *), Capabilities.current.lensSmudge else {
+            throw XCTSkip("需要 macOS 26")
+        }
+        let image = try subjectImage()
+        try await withApp { app in
+            try await app.test(.POST, "vision/lens-smudge", beforeRequest: { req in
+                try req.content.encode(ImageBody(imageBase64: image))
+            }, afterResponse: { res async throws in
+                XCTAssertEqual(res.status, .ok, res.body.string)
+                let body = try res.content.decode(LensSmudgeResponse.self)
+                XCTAssertTrue((0.0 ... 1.0).contains(body.confidence), "\(body.confidence)")
+            })
+        }
+    }
+
+    func testSpeechAndTranslationListingsRespond() async throws {
+        guard #available(macOS 26.0, *), Capabilities.current.speechTranscription else {
+            throw XCTSkip("需要 macOS 26")
+        }
+        try await withApp { app in
+            try await app.test(.GET, "speech/supported-locales", afterResponse: { res async throws in
+                XCTAssertEqual(res.status, .ok, res.body.string)
+                let body = try res.content.decode(SpeechLocalesResponse.self)
+                print("speech supported: \(body.supported.count)，installed: \(body.installed)")
+                XCTAssertFalse(body.supported.isEmpty)
+            })
+            #if canImport(Translation)
+            try await app.test(.GET, "translation/supported-languages", afterResponse: { res async throws in
+                XCTAssertEqual(res.status, .ok, res.body.string)
+                let body = try res.content.decode(TranslationLanguagesResponse.self)
+                print("translation languages: \(body.languages)")
+                XCTAssertFalse(body.languages.isEmpty)
+            })
+            #endif
+        }
+    }
+    #endif
+
     // MARK: - PDF
 
     func testPDFExtractText() async throws {
