@@ -111,3 +111,44 @@ jobs:
           # 确认应用的代码确实被编译进了二进制
           nm -gU "$APP/LensTranslate" 2>/dev/null | head -5 || true
           find build/Build/Intermediates.noindex -name "RootView.o" | head -1 | grep -q RootView.o
+      - name: Launch in the simulator
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          APP=build/Build/Products/Debug-iphonesimulator/LensTranslate.app
+          BUNDLE_ID=$(/usr/libexec/PlistBuddy -c "Print :CFBundleIdentifier" "$APP/Info.plist")
+          DEVICE=$(xcrun simctl list devices available -j | python3 -c "
+          import json, sys
+          devices = json.load(sys.stdin)['devices']
+          phones = [d for runtime, items in devices.items() if 'iOS' in runtime for d in items if d['name'].startswith('iPhone')]
+          print(phones[-1]['udid'] if phones else '')
+          ")
+          if [ -z "$DEVICE" ]; then
+            echo "::warning::runner 上没有可用的 iPhone 模拟器，跳过启动检查"
+            exit 0
+          fi
+          echo "使用模拟器 $DEVICE，应用 $BUNDLE_ID"
+          xcrun simctl boot "$DEVICE"
+          xcrun simctl bootstatus "$DEVICE" -b
+          xcrun simctl install "$DEVICE" "$APP"
+          # 预先授予权限，避免系统弹窗挡住界面
+          xcrun simctl privacy "$DEVICE" grant camera "$BUNDLE_ID" || true
+          xcrun simctl privacy "$DEVICE" grant microphone "$BUNDLE_ID" || true
+          xcrun simctl privacy "$DEVICE" grant speech-recognition "$BUNDLE_ID" || true
+          xcrun simctl launch "$DEVICE" "$BUNDLE_ID"
+          sleep 12
+          xcrun simctl io "$DEVICE" screenshot launch.png
+          # 启动 12 秒后进程仍在，说明没有启动即崩溃
+          if xcrun simctl spawn "$DEVICE" launchctl list | grep -q "$BUNDLE_ID"; then
+            echo "应用仍在运行"
+          else
+            echo "::error::应用启动后已退出"
+            ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | tail -5 || true
+            exit 1
+          fi
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: ios-launch-screenshot
+          path: ios/launch.png
+          if-no-files-found: ignore
