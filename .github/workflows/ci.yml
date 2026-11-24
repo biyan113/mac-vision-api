@@ -146,6 +146,16 @@ jobs:
             ls ~/Library/Logs/DiagnosticReports/ 2>/dev/null | tail -5 || true
             exit 1
           fi
+      - name: Read the launch screenshot
+        working-directory: ios
+        run: |
+          set -euo pipefail
+          if [ ! -f launch.png ]; then
+            echo "::warning::没有截图（未找到模拟器），跳过界面检查"
+            exit 0
+          fi
+          # 底部的模式切换是任何状态下都应该出现的界面元素
+          swift ci/read-screenshot.swift launch.png 翻译 学词 对话
       - uses: actions/upload-artifact@v4
         if: always()
         with:
