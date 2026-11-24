@@ -232,7 +232,19 @@ done | sort -t, -k1 -nr | head -20
 ## macOS 26 能力的前提
 
 - **语音转写**：首次使用某种语言时，服务会自动下载系统语音模型，这次请求会比较慢。`GET /speech/supported-locales` 可查看支持和已安装的语言。
-- **翻译**：语言包需要先在“系统设置 → 通用 → 语言与地区 → 翻译语言”里下载，否则接口返回 409。
+- **翻译**：语言包需要先在“系统设置 → 通用 → 语言与地区 → 翻译语言”里下载，否则接口返回 409。系统支持的语言有限，可用 `GET /translation/supported-languages` 查看。在 macOS 26 上实测的列表包含中文、英语、日语、韩语、印尼语、泰语、越南语等 21 种，**不包含马来语**。
+
+## 词库工具
+
+`tools/vocab/build_vocab.py` 把 [English Vocabulary Vault](https://github.com/lilinji/English) 的 949 个 Excel 词表合并去重成一个 SQLite 数据库（约 8 万个单词和短语，50 MB），供配套的学词应用使用。
+
+```bash
+pip install openpyxl
+git clone --depth 1 https://github.com/lilinji/English
+python3 tools/vocab/build_vocab.py English vocab.sqlite
+```
+
+词库数据采用 CC BY-NC-SA 4.0 许可（不可商用、需署名、相同方式共享），生成的数据库同样受此约束，所以本仓库只包含脚本，不包含数据。
 
 ## 开发
 
