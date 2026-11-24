@@ -244,10 +244,14 @@ cd vision-web && npm install && npm run dev   # Web 界面开发服务器
 
 ## 发布
 
-推送形如 `v1.0.0` 的标签会触发 `.github/workflows/release.yml`：
+1. 更新 `Sources/VisionAPI/configure.swift` 里的 `version` 并合入 `master`。
+2. 在 GitHub 的 Actions 页面选择 **Release** 工作流，点 **Run workflow**，填入同样的版本号（如 `1.0.0`）。也可以直接推送 `v1.0.0` 标签。
 
-1. 在 macOS runner 上编译后端，连同 Web 界面打包成 `vision-api-macos-arm64.tar.gz`，发布到 GitHub Releases。
-2. 构建 Web 界面镜像并推送到 `ghcr.io/biyan113/mac-vision-api-web`。
+工作流会做这些事：
+
+1. 校验版本号与代码中的 `version` 一致。
+2. 在 macOS runner 上编译后端，连同 Web 界面打包成 `vision-api-macos-arm64.tar.gz`，启动一次做冒烟检查，然后创建标签并发布到 GitHub Releases。
+3. 构建 Web 界面镜像并推送到 `ghcr.io/biyan113/mac-vision-api-web`。
 
 每次推送和 PR 会运行 `.github/workflows/ci.yml`（后端编译与测试、前端构建）。
 
