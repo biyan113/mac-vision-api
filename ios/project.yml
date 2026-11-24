@@ -1,0 +1,37 @@
+# 用 XcodeGen 生成 Xcode 工程：brew install xcodegen && xcodegen generate
+name: LensTranslate
+options:
+  bundleIdPrefix: io.github.lenstranslate
+  deploymentTarget:
+    iOS: "18.0"
+  createIntermediateGroups: true
+packages:
+  LensCore:
+    path: LensCore
+targets:
+  LensTranslate:
+    type: application
+    platform: iOS
+    sources:
+      - LensTranslate
+    dependencies:
+      - package: LensCore
+    settings:
+      base:
+        PRODUCT_BUNDLE_IDENTIFIER: io.github.lenstranslate.app
+        SWIFT_VERSION: "5.0"
+        TARGETED_DEVICE_FAMILY: "1"
+        MARKETING_VERSION: "0.1.0"
+        CURRENT_PROJECT_VERSION: "1"
+        CODE_SIGN_STYLE: Automatic
+    info:
+      path: LensTranslate/Info.plist
+      properties:
+        CFBundleDisplayName: 译镜
+        UILaunchScreen: {}
+        UISupportedInterfaceOrientations:
+          - UIInterfaceOrientationPortrait
+        NSCameraUsageDescription: 用相机识别并翻译眼前的文字，画面只在本机处理。
+        NSMicrophoneUsageDescription: 用麦克风听取对话并翻译，录音只在本机处理。
+        NSSpeechRecognitionUsageDescription: 把语音转成文字后再翻译。
+        ITSAppUsesNonExemptEncryption: false

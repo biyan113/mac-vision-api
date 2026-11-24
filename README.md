@@ -234,6 +234,10 @@ done | sort -t, -k1 -nr | head -20
 - **语音转写**：首次使用某种语言时，服务会自动下载系统语音模型，这次请求会比较慢。`GET /speech/supported-locales` 可查看支持和已安装的语言。
 - **翻译**：语言包需要先在“系统设置 → 通用 → 语言与地区 → 翻译语言”里下载，否则接口返回 409。系统支持的语言有限，可用 `GET /translation/supported-languages` 查看。在 macOS 26 上实测的列表包含中文、英语、日语、韩语、印尼语、泰语、越南语等 21 种，**不包含马来语**。
 
+## iPhone 应用
+
+`ios/` 目录下是配套的 iPhone 应用“译镜”：镜头实时翻译、看英文时收集生词、两人对话翻译，全部在手机本地完成。它不依赖本服务，直接调用 iOS 上同样的系统框架。构建方法和限制见 [ios/README.md](ios/README.md)。
+
 ## 词库工具
 
 `tools/vocab/build_vocab.py` 把 [English Vocabulary Vault](https://github.com/lilinji/English) 的 949 个 Excel 词表合并去重成一个 SQLite 数据库（约 8 万个单词和短语，50 MB），供配套的学词应用使用。

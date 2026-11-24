@@ -1,0 +1,6 @@
+*.xcodeproj
+LensTranslate/Info.plist
+LensCore/.build/
+build/
+DerivedData/
+vocab.sqlite
