@@ -42,3 +42,32 @@ jobs:
           cache-dependency-path: vision-web/package-lock.json
       - run: npm ci
       - run: npm run build
+
+  install:
+    name: Install script (latest release)
+    runs-on: macos-26
+    steps:
+      - uses: actions/checkout@v4
+      - name: Install latest release with scripts/install.sh
+        env:
+          VISION_API_HOME: ${{ runner.temp }}/vision-api
+        run: bash scripts/install.sh
+      - name: Start and check the installed service
+        env:
+          VISION_API_HOME: ${{ runner.temp }}/vision-api
+        run: |
+          set -euo pipefail
+          cd "$VISION_API_HOME"
+          test -x ./vision-api
+          test -f Public/index.html
+          ./vision-api serve --env production --hostname 127.0.0.1 --port 8099 &
+          PID=$!
+          trap 'kill $PID 2>/dev/null || true' EXIT
+          for i in $(seq 1 30); do
+            if curl -fsS http://127.0.0.1:8099/health >/dev/null 2>&1; then break; fi
+            sleep 1
+          done
+          curl -fsS http://127.0.0.1:8099/health
+          echo
+          curl -fsS -o /dev/null http://127.0.0.1:8099/
+          curl -fsS -o /dev/null http://127.0.0.1:8099/Swagger/index.html

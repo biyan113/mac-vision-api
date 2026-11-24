@@ -144,6 +144,27 @@ final class RecognitionTests: XCTestCase {
         }
     }
 
+    func testRecognizeTextAcceptsShortLanguageCodes() async throws {
+        // 旧版 Web 界面发送的是 zh,en 这样的简写
+        let image = try textImage("HELLO VISION 2026")
+        try await withApp { app in
+            try await app.test(.POST, "text-detection/recognize-text", beforeRequest: { req in
+                try req.content.encode(ImageBody(imageBase64: image, recognitionLanguages: "zh,en"))
+            }, afterResponse: { res async throws in
+                XCTAssertEqual(res.status, .ok, res.body.string)
+                let text = try res.content.decode(recognizeTextResponse.self).text.uppercased()
+                XCTAssertTrue(text.contains("HELLO"), text)
+            })
+        }
+    }
+
+    func testNormalizeLanguage() {
+        XCTAssertEqual(TextDetectionController.normalizeLanguage("zh"), "zh-Hans")
+        XCTAssertEqual(TextDetectionController.normalizeLanguage("EN"), "en-US")
+        XCTAssertEqual(TextDetectionController.normalizeLanguage("zh-Hant"), "zh-Hant")
+        XCTAssertEqual(TextDetectionController.normalizeLanguage("ja-JP"), "ja-JP")
+    }
+
     func testSupportedLanguagesIncludesEnglish() async throws {
         try await withApp { app in
             try await app.test(.GET, "text-detection/supported-languages", afterResponse: { res async throws in
