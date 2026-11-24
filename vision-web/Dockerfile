@@ -1,6 +1,7 @@
 # Vision API Web 界面镜像（仅前端）。
 # 后端依赖 Apple Vision 等 macOS 框架，无法运行在容器里，需直接运行在 Mac 上。
-FROM node:20-alpine AS builder
+# 前端产物与 CPU 架构无关，固定在构建机的原生架构上编译，避免在模拟的 arm64 下跑 npm（极慢）
+FROM --platform=$BUILDPLATFORM node:20-alpine AS builder
 WORKDIR /app
 COPY package*.json ./
 RUN npm ci
