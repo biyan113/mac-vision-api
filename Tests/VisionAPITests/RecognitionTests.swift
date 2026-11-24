@@ -320,17 +320,23 @@ final class RecognitionTests: XCTestCase {
         }
         let image = try subjectImage()
         try await withApp { app in
+            // 该模型在 CI 的虚拟机上无法加载（框架内部错误，接口按约定返回 422）；真机上应返回 200。
+            // 跳过必须在请求回调之外抛出，否则会被 XCTVapor 记为失败。
+            var unavailable: String?
             try await app.test(.POST, "vision/lens-smudge", beforeRequest: { req in
                 try req.content.encode(ImageBody(imageBase64: image))
             }, afterResponse: { res async throws in
-                // 该模型在 CI 的虚拟机上无法加载（框架内部错误，接口按约定返回 422）；真机上应返回 200
                 if res.status == .unprocessableEntity {
-                    throw XCTSkip("当前环境无法运行镜头污渍模型：\(res.body.string)")
+                    unavailable = res.body.string
+                    return
                 }
                 XCTAssertEqual(res.status, .ok, res.body.string)
                 let body = try res.content.decode(LensSmudgeResponse.self)
                 XCTAssertTrue((0.0 ... 1.0).contains(body.confidence), "\(body.confidence)")
             })
+            if let unavailable {
+                throw XCTSkip("当前环境无法运行镜头污渍模型：\(unavailable)")
+            }
         }
     }
 
