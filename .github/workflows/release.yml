@@ -16,6 +16,11 @@ on:
         description: "版本号，不带 v 前缀，例如 1.0.0（需与 Sources/VisionAPI/configure.swift 中的 version 一致）"
         required: true
         type: string
+      image_only:
+        description: "只重新构建并推送 Web 镜像，不重新发布 macOS 二进制"
+        required: false
+        default: false
+        type: boolean
 
 permissions:
   contents: write
@@ -55,6 +60,7 @@ jobs:
   macos-binary:
     name: macOS binary
     needs: prepare
+    if: ${{ !inputs.image_only }}
     runs-on: macos-26
     steps:
       - uses: actions/checkout@v4
