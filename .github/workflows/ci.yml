@@ -127,7 +127,7 @@ jobs:
             echo "::warning::runner 上没有可用的 iPhone 模拟器，跳过启动检查"
             exit 0
           fi
-          echo "使用模拟器 $DEVICE，应用 $BUNDLE_ID"
+          echo "simulator=${DEVICE} bundle=${BUNDLE_ID}"
           xcrun simctl boot "$DEVICE"
           xcrun simctl bootstatus "$DEVICE" -b
           xcrun simctl install "$DEVICE" "$APP"
