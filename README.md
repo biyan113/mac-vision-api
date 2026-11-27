@@ -129,6 +129,45 @@ curl -X POST http://localhost:8080/translation/translate \
 
 图片类接口都接受四种输入之一：`imageFile`（上传）、`imageURL`、`imageBase64`、`imagePath`。PDF 和音频接口把前缀换成 `pdf` 和 `audio`。
 
+## 桌面应用
+
+仓库里还有一个原生的 AppKit 桌面应用。它直接调用系统框架，不需要先启动服务；也可以在应用里启停同一套 API 服务。
+
+```bash
+# 直接运行
+swift run VisionApp
+
+# 或者打包成可双击的应用（同时生成用于分发的 zip）
+./scripts/build-app.sh
+open .build/VisionApp.app
+```
+
+- 文字识别、背景移除、图像分类、物体检测、条码识别、隐私打码（给人脸、文字、条码打马赛克）
+- 打开、拖入或粘贴图片和 PDF；PDF 可翻页、提取内嵌文本、逐页识别
+- 导出可搜索 PDF：在扫描件上叠加一层不可见的识别文字，之后可以搜索和复制
+- 从识别结果里找出链接、电话、日期和地址，点一下打开或复制
+- 截屏识别（⇧⌘2）；全局快捷键 ⌃⌥⌘O 在任何应用里框选屏幕，文字直接进剪贴板
+- 点击原图上的检测框定位到对应结果，反之亦然；结果可复制、保存、导出 JSON
+- 批量处理多个文件；在应用内启停 API 服务并查看日志，可设置访问密钥
+- 中英文界面
+
+打包脚本读取 `CODESIGN_IDENTITY` 和 `NOTARY_PROFILE` 做 Developer ID 签名和公证；不设置时使用临时签名，只适合在本机运行。打包只在本地进行，不经过 CI。
+
+## 给 AI 助手用：MCP 服务
+
+`VisionMCP` 是一个通过标准输入输出通信的 MCP 服务，让 Claude 等 AI 助手直接调用这台 Mac 上的识别能力。它只读写你给出的本地路径，不联网。
+
+```bash
+swift build -c release --product VisionMCP
+
+# 接入 Claude Code
+claude mcp add vision -- "$(swift build -c release --show-bin-path)/VisionMCP"
+```
+
+用 `scripts/build-app.sh` 打包后，同一个程序也在 `VisionApp.app/Contents/MacOS/VisionMCP`。
+
+提供的工具：`recognize_text`、`extract_text_insights`、`scan_barcodes`、`classify_image`、`detect_objects`、`remove_background`、`redact_image`、`pdf_extract_text`、`make_searchable_pdf`。
+
 ## Web 界面
 
 发布包自带 Web 界面，启动后访问 `http://localhost:8080/`。页面包括：

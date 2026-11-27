@@ -11,6 +11,10 @@ let package = Package(
         .library(name: "VisionAPI", targets: ["VisionAPI"]),
         // 开箱即用的服务端可执行文件
         .executable(name: "App", targets: ["App"]),
+        // AppKit 桌面应用
+        .executable(name: "VisionApp", targets: ["VisionApp"]),
+        // 供 AI 助手调用的 MCP 服务（标准输入输出）
+        .executable(name: "VisionMCP", targets: ["VisionMCP"]),
     ],
     dependencies: [
         // 💧 A server-side Swift web framework.
@@ -37,6 +41,27 @@ let package = Package(
                 .product(name: "Vapor", package: "vapor"),
             ],
             swiftSettings: swiftSettings
+        ),
+        // 不依赖 Vapor 和 AppKit 的 Vision / PDFKit 封装，供桌面应用和 MCP 服务使用
+        .target(
+            name: "VisionCore",
+            swiftSettings: swiftSettings
+        ),
+        .executableTarget(
+            name: "VisionApp",
+            dependencies: [
+                "VisionCore",
+                .target(name: "VisionAPI"),
+                .product(name: "Vapor", package: "vapor"),
+            ]
+        ),
+        .executableTarget(
+            name: "VisionMCP",
+            dependencies: ["VisionCore"]
+        ),
+        .testTarget(
+            name: "VisionCoreTests",
+            dependencies: ["VisionCore"]
         ),
         .testTarget(
             name: "VisionAPITests",
